@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hotel Manager's Flash Report</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #ffffff;
+    --panel: #ffffff;
+    --soft: #f5f5f4;
+    --line: #e7e5e4;
+    --ink: #1c1917;
+    --muted: #78716c;
+    --pos-bg: #dcfce7;
+    --pos-fg: #166534;
+    --neg-bg: #fee2e2;
+    --neg-fg: #991b1b;
+    --blue: #3b82f6;
+    --green: #22c55e;
+    --red: #ef4444;
+    --amber: #f59e0b;
+    --purple: #8b5cf6;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: #fafaf9;
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  /* LOGIN SCREEN */
+  .login-screen {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: linear-gradient(135deg, #fafaf9 0%, #f1f5f9 100%);
+  }
+  .login-box {
+    width: 100%;
+    max-width: 380px;
+    background: white;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 32px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.04);
+  }
+  .login-box h1 { font-size: 22px; margin: 0 0 4px; font-weight: 600; }
+  .login-box .subtitle { color: var(--muted); font-size: 13px; margin-bottom: 24px; }
+  .form-group { margin-bottom: 16px; }
+  .form-group label { display: block; font-size: 12px; font-weight: 500; margin-bottom: 6px; }
+  .form-group input {
+    width: 100%; padding: 10px 12px; border: 1px solid var(--line);
+    border-radius: 8px; font-size: 14px; font-family: inherit;
+  }
+  .form-group input:focus { outline: none; border-color: var(--ink); }
+  .login-btn {
+    width: 100%; padding: 11px; background: var(--ink); color: white;
+    border: none; border-radius: 8px; font-size: 14px; font-weight: 500;
+    cursor: pointer; margin-top: 8px;
+  }
+  .login-btn:hover { background: #404040; }
+  .login-error {
+    background: var(--neg-bg); color: var(--neg-fg); padding: 10px 12px;
+    border-radius: 8px; font-size: 13px; margin-bottom: 16px; display: none;
+  }
+  .login-error.show { display: block; }
+  .login-footer {
+    margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line);
+    font-size: 11px; color: var(--muted); text-align: center; line-height: 1.5;
+  }
+
+  /* TOP BAR */
+  .topbar {
+    background: white; border-bottom: 1px solid var(--line);
+    padding: 12px 24px; display: flex; align-items: center; justify-content: space-between;
+  }
+  .topbar-left { font-weight: 600; font-size: 14px; }
+  .topbar-right { display: flex; gap: 12px; align-items: center; font-size: 13px; }
+  .user-tag { color: var(--muted); }
+  .logout-btn {
+    padding: 6px 14px; background: white; border: 1px solid var(--line);
+    border-radius: 6px; font-size: 12px; cursor: pointer; color: var(--ink);
+  }
+  .logout-btn:hover { background: var(--soft); }
+
+  /* UPLOADER */
+  .uploader {
+    max-width: 1100px; margin: 24px auto; padding: 24px; background: white;
+    border: 1px solid var(--line); border-radius: 12px; text-align: center;
+  }
+  .uploader h2 { margin: 0 0 8px; font-weight: 600; font-size: 18px; }
+  .uploader p { color: var(--muted); margin: 0 0 16px; }
+  .file-input {
+    display: inline-block; padding: 10px 20px; background: var(--ink); color: white;
+    border-radius: 8px; cursor: pointer; font-weight: 500; border: none;
+  }
+  .file-input:hover { background: #404040; }
+  input[type="file"] { display: none; }
+  .download-btn {
+    margin-left: 12px; padding: 10px 20px; background: white;
+    border: 1px solid var(--line); border-radius: 8px; cursor: pointer;
+    font-weight: 500; color: var(--ink);
+  }
+  .download-btn:hover { background: var(--soft); }
+  .download-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  #dashboard {
+    max-width: 1100px; margin: 0 auto 40px; padding: 32px;
+    background: white; border-radius: 12px; border: 1px solid var(--line);
+  }
+  .hidden { display: none !important; }
+
+  .header { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 16px; border-bottom: 1px solid var(--line); margin-bottom: 24px; }
+  .header h1 { font-size: 24px; margin: 0 0 4px; font-weight: 600; }
+  .header .meta { color: var(--muted); font-size: 13px; }
+  .pill { display: inline-block; padding: 6px 12px; background: var(--soft); border-radius: 999px; font-size: 12px; color: var(--muted); }
+
+  .section-title { font-size: 11px; letter-spacing: 0.08em; color: var(--muted); text-transform: uppercase; margin: 24px 0 12px; font-weight: 600; }
+
+  .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 12px; }
+  .kpi { background: var(--soft); border-radius: 10px; padding: 16px; }
+  .kpi-label { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+  .kpi-value { font-size: 28px; font-weight: 600; line-height: 1.1; margin-bottom: 12px; }
+  .kpi-foot { display: flex; gap: 8px; align-items: center; font-size: 12px; flex-wrap: wrap; }
+  .delta { padding: 2px 8px; border-radius: 4px; font-weight: 500; font-size: 11px; }
+  .delta.pos { background: var(--pos-bg); color: var(--pos-fg); }
+  .delta.neg { background: var(--neg-bg); color: var(--neg-fg); }
+  .ly-label { color: var(--muted); }
+
+  .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 8px; }
+  .card { border: 1px solid var(--line); border-radius: 12px; padding: 20px; }
+  .card-title { font-size: 11px; letter-spacing: 0.08em; color: var(--muted); text-transform: uppercase; margin-bottom: 14px; font-weight: 600; }
+
+  .stack-bar { display: flex; height: 28px; border-radius: 6px; overflow: hidden; margin-bottom: 12px; }
+  .stack-bar > div { display: flex; align-items: center; justify-content: center; color: white; font-size: 12px; font-weight: 500; }
+  .legend { display: flex; flex-wrap: wrap; gap: 16px; font-size: 12px; margin-bottom: 16px; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+  .inv-row { display: grid; grid-template-columns: 100px 1fr 40px; gap: 12px; align-items: center; padding: 4px 0; font-size: 13px; }
+  .inv-bar { height: 8px; background: var(--soft); border-radius: 4px; overflow: hidden; }
+  .inv-bar > div { height: 100%; }
+  .inv-row .num { text-align: right; }
+  .total-line { margin-top: 12px; font-size: 12px; color: var(--muted); }
+
+  .donut-wrap { position: relative; display: flex; justify-content: center; align-items: center; }
+  .rev-legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; margin-bottom: 16px; }
+  .rev-bars { margin-top: 16px; }
+  .rev-bar-row { display: grid; grid-template-columns: 110px 1fr 100px; align-items: center; gap: 12px; margin-bottom: 8px; font-size: 13px; }
+  .rev-bar { height: 8px; background: #dbeafe; border-radius: 4px; overflow: hidden; }
+  .rev-bar > div { height: 100%; background: #93c5fd; }
+  .rev-bar-row .num { text-align: right; color: var(--muted); }
+
+  .tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+  .tab { padding: 8px 16px; border: 1px solid var(--line); border-radius: 8px; background: white; cursor: pointer; font-size: 13px; }
+  .tab.active { background: var(--ink); color: white; border-color: var(--ink); }
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; font-size: 11px; letter-spacing: 0.06em; color: var(--muted); text-transform: uppercase; font-weight: 600; padding: 10px 0; border-bottom: 1px solid var(--line); }
+  th.right, td.right { text-align: right; }
+  td { padding: 12px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+  tr:last-child td { border-bottom: none; }
+  .chart-wrap { height: 280px; margin-top: 16px; }
+
+  @media print { body { background: white; } .uploader, .topbar { display: none; } }
+  @media (max-width: 768px) {
+    .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+    .row-2 { grid-template-columns: 1fr; }
+    #dashboard { padding: 16px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="loginScreen" class="login-screen">
+  <div class="login-box">
+    <h1>Sign in</h1>
+    <div class="subtitle">Hotel Manager's Flash Report</div>
+    <div class="login-error" id="loginError">Invalid username or password</div>
+    <form id="loginForm">
+      <div class="form-group">
+        <label for="username">Username</label>
+        <input type="text" id="username" autocomplete="username" required autofocus>
+      </div>
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" autocomplete="current-password" required>
+      </div>
+      <button type="submit" class="login-btn">Sign in</button>
+    </form>
+    <div class="login-footer">
+      Authorised users only. Sessions expire after 8 hours.
+    </div>
+  </div>
+</div>
+
+<div id="app" class="hidden">
+  <div class="topbar">
+    <div class="topbar-left">Hotel Flash Report</div>
+    <div class="topbar-right">
+      <span class="user-tag">Signed in as <strong id="currentUser">—</strong></span>
+      <button class="logout-btn" id="logoutBtn">Sign out</button>
+    </div>
+  </div>
+
+  <div class="uploader">
+    <h2>Upload Manager's Report</h2>
+    <p>Drop your <code>Manager_Reports.xls</code> file to generate the dashboard. Files are processed locally in your browser — nothing is uploaded to any server.</p>
+    <label class="file-input">
+      Choose .xls file
+      <input type="file" id="fileInput" accept=".xls,.xlsx">
+    </label>
+    <button class="download-btn" id="downloadBtn" disabled>Download as JPEG</button>
+    <button class="download-btn" id="loadSampleBtn">Load sample</button>
+  </div>
+
+  <div id="dashboard" class="hidden">
+    <div class="header">
+      <div>
+        <h1 id="hotelName">Hotel Name</h1>
+        <div class="meta" id="metaLine">Manager's flash report</div>
+      </div>
+      <div><span class="pill">Today vs last year</span></div>
+    </div>
+
+    <div class="section-title">Occupancy & Rooms — Today</div>
+    <div class="kpi-grid">
+      <div class="kpi"><div class="kpi-label">Occupancy rate</div><div class="kpi-value" id="occ-val">—</div><div class="kpi-foot"><span class="delta" id="occ-delta">—</span><span class="ly-label" id="occ-ly">LY —</span></div></div>
+      <div class="kpi"><div class="kpi-label">Rooms occupied</div><div class="kpi-value" id="rooms-val">—</div><div class="kpi-foot"><span class="delta" id="rooms-delta">—</span><span class="ly-label" id="rooms-ly">LY —</span></div></div>
+      <div class="kpi"><div class="kpi-label">Vacant rooms</div><div class="kpi-value" id="vacant-val">—</div><div class="kpi-foot"><span class="delta" id="vacant-delta">—</span><span class="ly-label" id="vacant-ly">LY —</span></div></div>
+      <div class="kpi"><div class="kpi-label">Out of order</div><div class="kpi-value" id="ooo-val">—</div><div class="kpi-foot"><span class="delta" id="ooo-delta">—</span><span class="ly-label" id="ooo-ly">LY —</span></div></div>
+    </div>
+    <div class="kpi-grid">
+      <div class="kpi"><div class="kpi-label">Arrivals today</div><div class="kpi-value" id="arr-val">—</div><div class="kpi-foot"><span class="delta" id="arr-delta">—</span><span class="ly-label" id="arr-ly">LY —</span></div></div>
+      <div class="kpi"><div class="kpi-label">Departures today</div><div class="kpi-value" id="dep-val">—</div><div class="kpi-foot"><span class="delta" id="dep-delta">—</span><span class="ly-label" id="dep-ly">LY —</span></div></div>
+      <div></div><div></div>
+    </div>
+
+    <div class="section-title">Revenue — Today</div>
+    <div class="kpi-grid">
+      <div class="kpi"><div class="kpi-label">Room revenue</div><div class="kpi-value" id="rrev-val">—</div><div class="kpi-foot"><span class="delta" id="rrev-delta">—</span><span class="ly-label" id="rrev-ly">LY —</span></div></div>
+      <div class="kpi"><div class="kpi-label">F&amp;B revenue</div><div class="kpi-value" id="fbrev-val">—</div><div class="kpi-foot"><span class="delta" id="fbrev-delta">—</span><span class="ly-label" id="fbrev-ly">LY —</span></div></div>
+      <div class="kpi"><div class="kpi-label">Avg room rate (ARR)</div><div class="kpi-value" id="arr2-val">—</div><div class="kpi-foot"><span class="delta" id="arr2-delta">—</span><span class="ly-label" id="arr2-ly">LY —</span></div></div>
+      <div class="kpi"><div class="kpi-label">RevPAR</div><div class="kpi-value" id="revpar-val">—</div><div class="kpi-foot"><span class="delta" id="revpar-delta">—</span><span class="ly-label" id="revpar-ly">LY —</span></div></div>
+    </div>
+
+    <div class="row-2">
+      <div class="card">
+        <div class="card-title">Room Inventory Breakdown — Today</div>
+        <div class="stack-bar" id="stackBar"></div>
+        <div class="legend" id="invLegend"></div>
+        <div id="invRows"></div>
+        <div class="total-line" id="totalInv">Total inventory: — rooms</div>
+      </div>
+      <div class="card">
+        <div class="card-title">Revenue Mix — Today</div>
+        <div class="rev-legend" id="revLegend"></div>
+        <div class="donut-wrap" style="height: 180px;"><canvas id="donutChart"></canvas></div>
+        <div class="rev-bars">
+          <div class="rev-bar-row"><span>Rev/guest</span><div class="rev-bar"><div id="revGuestBar"></div></div><span class="num" id="revGuestVal">—</span></div>
+          <div class="rev-bar-row"><span>LY rev/guest</span><div class="rev-bar"><div id="revGuestLYBar"></div></div><span class="num" id="revGuestLYVal">—</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top: 16px;">
+      <div class="card-title">Period comparison — this year vs last year</div>
+      <div class="tabs">
+        <div class="tab active" data-period="today">Today</div>
+        <div class="tab" data-period="mtd">Month to date</div>
+        <div class="tab" data-period="ytd">Year to date</div>
+      </div>
+      <table>
+        <thead><tr><th>Metric</th><th class="right">This year</th><th class="right">Last year</th><th class="right">Var</th></tr></thead>
+        <tbody id="compareTable"></tbody>
+      </table>
+    </div>
+
+    <div class="card" style="margin-top: 16px;">
+      <div class="card-title">Occupancy % — Today / MTD / YTD comparison</div>
+      <div class="chart-wrap"><canvas id="occChart"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// AUTH (client-side; bypassable by determined users — see notes)
+// ============================================================
+// To add or change a user:
+//   1. Open this page in a browser
+//   2. Open the console (F12 → Console tab)
+//   3. Run: hashPassword('your-new-password')
+//   4. Copy the printed hash and add a line to the USERS object below
+//   5. Save and re-upload the file to your hosting
+
+const USERS = {
+  // username : sha256(password)
+  'admin':     '8b3ce0c3977ee6e8d53efeb1fb5b4f82bfb85e44b706c4eded197bd78875da67', // password: admin@2026
+  'donatello': '0aa6aa6a97fc2ccb4000f87bd9e93a2125582ff044a106c3418d95c04fbc7cae', // password: hotel123
+  'manager':   '2e064c30dfe840ff76432c401a0d0c19f0b30d823f60fd378353a6a63e431e75', // password: manager2026
+};
+
+const SESSION_KEY = 'hfr_session_v1';
+const SESSION_HOURS = 8;
+
+async function _hash(plain) {
+  const buf = new TextEncoder().encode(plain);
+  const hashBuf = await crypto.subtle.digest('SHA-256', buf);
+  return Array.from(new Uint8Array(hashBuf)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+async function hashPassword(plain) {
+  const h = await _hash(plain);
+  console.log('Hash for "' + plain + '":', h);
+  return h;
+}
+window.hashPassword = hashPassword;
+
+function getSession() {
+  try {
+    const raw = sessionStorage.getItem(SESSION_KEY);
+    if (!raw) return null;
+    const s = JSON.parse(raw);
+    if (Date.now() > s.expires) { sessionStorage.removeItem(SESSION_KEY); return null; }
+    return s;
+  } catch { return null; }
+}
+function setSession(username) {
+  sessionStorage.setItem(SESSION_KEY, JSON.stringify({
+    user: username, expires: Date.now() + SESSION_HOURS * 60 * 60 * 1000,
+  }));
+}
+function clearSession() { sessionStorage.removeItem(SESSION_KEY); }
+
+async function attemptLogin(username, password) {
+  const expected = USERS[username.toLowerCase().trim()];
+  if (!expected) return false;
+  const actual = await _hash(password);
+  return actual === expected;
+}
+
+function showApp(username) {
+  document.getElementById('loginScreen').classList.add('hidden');
+  document.getElementById('app').classList.remove('hidden');
+  document.getElementById('currentUser').textContent = username;
+}
+function showLogin() {
+  document.getElementById('loginScreen').classList.remove('hidden');
+  document.getElementById('app').classList.add('hidden');
+  document.getElementById('username').value = '';
+  document.getElementById('password').value = '';
+  setTimeout(() => document.getElementById('username').focus(), 50);
+}
+
+document.getElementById('loginForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const u = document.getElementById('username').value;
+  const p = document.getElementById('password').value;
+  const errEl = document.getElementById('loginError');
+  errEl.classList.remove('show');
+  const ok = await attemptLogin(u, p);
+  if (ok) {
+    const uname = u.toLowerCase().trim();
+    setSession(uname);
+    showApp(uname);
+  } else {
+    errEl.classList.add('show');
+    document.getElementById('password').value = '';
+  }
+});
+
+document.getElementById('logoutBtn').addEventListener('click', () => {
+  clearSession();
+  showLogin();
+});
+
+(function bootAuth() {
+  const s = getSession();
+  if (s) showApp(s.user);
+  else showLogin();
+})();
+
+// ============================================================
+// DASHBOARD
+// ============================================================
+const fmt = {
+  num: (v, d=0) => v == null || isNaN(v) ? '—' : Number(v).toLocaleString('en-US', {minimumFractionDigits: d, maximumFractionDigits: d}),
+  pct: (v, d=1) => v == null || isNaN(v) ? '—' : Number(v).toFixed(d) + '%',
+  money: (v, cur='AED', d=0) => v == null || isNaN(v) ? '—' : `${cur} ${Number(v).toLocaleString('en-US', {minimumFractionDigits: d, maximumFractionDigits: d})}`,
+};
+
+function setDelta(elId, value, isPercent=false, isPP=false, biggerIsBetter=true) {
+  const el = document.getElementById(elId);
+  if (value == null || isNaN(value)) { el.textContent = '—'; el.className = 'delta'; return; }
+  const sign = value > 0 ? '+' : '';
+  let text;
+  if (isPP) text = `${sign}${value.toFixed(2)}pp vs LY`;
+  else if (isPercent) text = `${sign}${value.toFixed(1)}% vs LY`;
+  else text = `${sign}${value.toFixed(0)} vs LY`;
+  el.textContent = text;
+  const good = biggerIsBetter ? value > 0 : value < 0;
+  el.className = 'delta ' + (Math.abs(value) < 0.01 ? '' : (good ? 'pos' : 'neg'));
+}
+
+function getCell(sheet, ref) {
+  const cell = sheet[ref];
+  if (!cell) return null;
+  const v = cell.v;
+  if (typeof v === 'number') return v;
+  if (typeof v === 'string') {
+    const n = parseFloat(v.replace(/,/g, ''));
+    return isNaN(n) ? v : n;
+  }
+  return v;
+}
+
+let chart1, chart2;
+
+function renderDashboard(data) {
+  document.getElementById('dashboard').classList.remove('hidden');
+  document.getElementById('downloadBtn').disabled = false;
+
+  document.getElementById('hotelName').textContent = data.hotelName || 'Hotel';
+  let dateStr = 'Business date: —';
+  if (data.businessDate) {
+    const d = new Date(data.businessDate);
+    if (!isNaN(d)) dateStr = 'Business date: ' + d.toLocaleDateString('en-US', {weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'});
+  }
+  document.getElementById('metaLine').textContent = `Manager's flash report · ${dateStr} · Currency: ${data.currency}`;
+
+  document.getElementById('occ-val').textContent = fmt.pct(data.occupancy);
+  setDelta('occ-delta', data.occupancy - data.occupancyLY, false, true);
+  document.getElementById('occ-ly').textContent = `LY ${fmt.pct(data.occupancyLY)}`;
+
+  document.getElementById('rooms-val').textContent = fmt.num(data.roomsOccupied);
+  setDelta('rooms-delta', data.roomsOccupied - data.roomsOccupiedLY);
+  document.getElementById('rooms-ly').textContent = `LY ${fmt.num(data.roomsOccupiedLY)}`;
+
+  document.getElementById('vacant-val').textContent = fmt.num(data.vacant);
+  setDelta('vacant-delta', data.vacant - data.vacantLY, false, false, false);
+  document.getElementById('vacant-ly').textContent = `LY ${fmt.num(data.vacantLY)}`;
+
+  document.getElementById('ooo-val').textContent = fmt.num(data.ooo);
+  setDelta('ooo-delta', data.ooo - data.oooLY, false, false, false);
+  document.getElementById('ooo-ly').textContent = `LY ${fmt.num(data.oooLY)}`;
+
+  document.getElementById('arr-val').textContent = fmt.num(data.arrivals);
+  setDelta('arr-delta', data.arrivals - data.arrivalsLY);
+  document.getElementById('arr-ly').textContent = `LY ${fmt.num(data.arrivalsLY)}`;
+
+  document.getElementById('dep-val').textContent = fmt.num(data.departures);
+  setDelta('dep-delta', data.departures - data.departuresLY);
+  document.getElementById('dep-ly').textContent = `LY ${fmt.num(data.departuresLY)}`;
+
+  document.getElementById('rrev-val').textContent = fmt.money(data.roomRev, data.currency);
+  setDelta('rrev-delta', data.roomRevLY ? ((data.roomRev - data.roomRevLY) / data.roomRevLY) * 100 : 0, true);
+  document.getElementById('rrev-ly').textContent = `LY ${fmt.money(data.roomRevLY, data.currency)}`;
+
+  document.getElementById('fbrev-val').textContent = fmt.money(data.fbRev, data.currency);
+  setDelta('fbrev-delta', data.fbRevLY ? ((data.fbRev - data.fbRevLY) / data.fbRevLY) * 100 : 0, true);
+  document.getElementById('fbrev-ly').textContent = `LY ${fmt.money(data.fbRevLY, data.currency)}`;
+
+  document.getElementById('arr2-val').textContent = fmt.money(data.arr, data.currency, 2);
+  setDelta('arr2-delta', data.arrLY ? ((data.arr - data.arrLY) / data.arrLY) * 100 : 0, true);
+  document.getElementById('arr2-ly').textContent = `LY ${fmt.money(data.arrLY, data.currency, 2)}`;
+
+  document.getElementById('revpar-val').textContent = fmt.money(data.revpar, data.currency, 2);
+  setDelta('revpar-delta', data.revparLY ? ((data.revpar - data.revparLY) / data.revparLY) * 100 : 0, true);
+  document.getElementById('revpar-ly').textContent = `LY ${fmt.money(data.revparLY, data.currency, 2)}`;
+
+  const totalInv = data.saleable + data.ooo + data.houseUse;
+  const occ = data.roomsOccupied;
+  const vac = data.vacant;
+  const ooo = data.ooo;
+  const hu = data.houseUse;
+  const stack = document.getElementById('stackBar');
+  stack.innerHTML = `
+    <div style="background:${getColor('blue')}; width:${(occ/totalInv*100)}%">${occ}</div>
+    <div style="background:${getColor('green')}; width:${(vac/totalInv*100)}%">${vac}</div>
+    <div style="background:${getColor('red')}; width:${(ooo/totalInv*100)}%">${ooo}</div>
+    <div style="background:${getColor('amber')}; width:${(hu/totalInv*100)}%">${hu > 2 ? hu : ''}</div>
+  `;
+  document.getElementById('invLegend').innerHTML = `
+    <span><span class="legend-dot" style="background:${getColor('blue')}"></span>Occupied: ${occ}</span>
+    <span><span class="legend-dot" style="background:${getColor('green')}"></span>Vacant: ${vac}</span>
+    <span><span class="legend-dot" style="background:${getColor('red')}"></span>OOO: ${ooo}</span>
+    <span><span class="legend-dot" style="background:${getColor('amber')}"></span>House use: ${hu}</span>
+  `;
+  const max = Math.max(occ, vac, ooo, hu, 1);
+  document.getElementById('invRows').innerHTML = `
+    <div class="inv-row"><span>Occupied</span><div class="inv-bar"><div style="width:${occ/max*100}%; background:${getColor('blue')}"></div></div><span class="num">${occ}</span></div>
+    <div class="inv-row"><span>Vacant</span><div class="inv-bar"><div style="width:${vac/max*100}%; background:${getColor('green')}"></div></div><span class="num">${vac}</span></div>
+    <div class="inv-row"><span>Out of order</span><div class="inv-bar"><div style="width:${ooo/max*100}%; background:${getColor('red')}"></div></div><span class="num">${ooo}</span></div>
+    <div class="inv-row"><span>House use</span><div class="inv-bar"><div style="width:${hu/max*100}%; background:${getColor('amber')}"></div></div><span class="num">${hu}</span></div>
+  `;
+  document.getElementById('totalInv').textContent = `Total inventory: ${totalInv} rooms`;
+
+  const totalRev = data.roomRev + data.fbRev + data.minorRev + data.taxes;
+  const pct = (n) => totalRev > 0 ? (n/totalRev*100) : 0;
+  document.getElementById('revLegend').innerHTML = `
+    <span><span class="legend-dot" style="background:${getColor('blue')}"></span>Rooms ${pct(data.roomRev).toFixed(1)}%</span>
+    <span><span class="legend-dot" style="background:${getColor('green')}"></span>F&amp;B ${pct(data.fbRev).toFixed(1)}%</span>
+    <span><span class="legend-dot" style="background:${getColor('purple')}"></span>Minor ${pct(data.minorRev).toFixed(1)}%</span>
+    <span><span class="legend-dot" style="background:${getColor('amber')}"></span>Taxes ${pct(data.taxes).toFixed(1)}%</span>
+  `;
+
+  if (chart1) chart1.destroy();
+  chart1 = new Chart(document.getElementById('donutChart'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Rooms', 'F&B', 'Minor', 'Taxes'],
+      datasets: [{
+        data: [data.roomRev, data.fbRev, data.minorRev, data.taxes],
+        backgroundColor: [getColor('blue'), getColor('green'), getColor('purple'), getColor('amber')],
+        borderWidth: 0
+      }]
+    },
+    options: { plugins: { legend: { display: false } }, maintainAspectRatio: false, cutout: '65%' }
+  });
+
+  const maxRG = Math.max(data.revPerGuest, data.revPerGuestLY, 1);
+  document.getElementById('revGuestBar').style.width = (data.revPerGuest/maxRG*100) + '%';
+  document.getElementById('revGuestLYBar').style.width = (data.revPerGuestLY/maxRG*100) + '%';
+  document.getElementById('revGuestVal').textContent = fmt.money(data.revPerGuest, data.currency);
+  document.getElementById('revGuestLYVal').textContent = fmt.money(data.revPerGuestLY, data.currency);
+
+  window.__currentData = data;
+  renderPeriodTable(data, 'today');
+  document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+  document.querySelector('.tab[data-period="today"]').classList.add('active');
+
+  if (chart2) chart2.destroy();
+  chart2 = new Chart(document.getElementById('occChart'), {
+    type: 'bar',
+    data: {
+      labels: ['Today', 'Month to date', 'Year to date'],
+      datasets: [
+        { label: 'This year', data: [data.occupancy, data.occupancyMTD, data.occupancyYTD], backgroundColor: getColor('blue'), borderRadius: 4 },
+        { label: 'Last year', data: [data.occupancyLY, data.occupancyMTDLY, data.occupancyYTDLY], backgroundColor: 'transparent', borderColor: getColor('red'), borderWidth: 2, borderRadius: 4 }
+      ]
+    },
+    options: {
+      maintainAspectRatio: false,
+      scales: { y: { ticks: { callback: v => v + '%' } } },
+      plugins: { legend: { position: 'top', align: 'start' } }
+    }
+  });
+}
+
+function renderPeriodTable(data, period) {
+  const rows = [
+    { label: 'Occupancy %', ty: data['occupancy_'+period], ly: data['occupancyLY_'+period], suffix: '%', isPP: true },
+    { label: 'Rooms occupied', ty: data['roomsOccupied_'+period], ly: data['roomsOccupiedLY_'+period] },
+    { label: 'Total guests', ty: data['guests_'+period], ly: data['guestsLY_'+period] },
+    { label: 'Room revenue', ty: data['roomRev_'+period], ly: data['roomRevLY_'+period], money: true },
+    { label: 'F&B revenue', ty: data['fbRev_'+period], ly: data['fbRevLY_'+period], money: true },
+    { label: 'ARR', ty: data['arr_'+period], ly: data['arrLY_'+period], money: true, decimals: 2 },
+    { label: 'RevPAR', ty: data['revpar_'+period], ly: data['revparLY_'+period], money: true, decimals: 2 },
+    { label: 'Revenue/guest', ty: data['revPerGuest_'+period], ly: data['revPerGuestLY_'+period], money: true, decimals: 2 },
+  ];
+  const tbody = document.getElementById('compareTable');
+  tbody.innerHTML = rows.map(r => {
+    const ty = r.ty, ly = r.ly;
+    let tyStr, lyStr, varStr, varClass;
+    if (r.suffix === '%') { tyStr = fmt.pct(ty, 2); lyStr = fmt.pct(ly, 2); }
+    else if (r.money) { tyStr = fmt.money(ty, data.currency, r.decimals||0); lyStr = fmt.money(ly, data.currency, r.decimals||0); }
+    else { tyStr = fmt.num(ty); lyStr = fmt.num(ly); }
+    if (ty == null || ly == null || isNaN(ty) || isNaN(ly)) { varStr = '—'; varClass=''; }
+    else if (r.isPP) {
+      const v = ty - ly;
+      varStr = (v>=0?'+':'') + v.toFixed(2) + 'pp';
+      varClass = v >= 0 ? 'pos' : 'neg';
+    } else {
+      const v = ly === 0 ? 0 : ((ty - ly) / ly) * 100;
+      varStr = (v>=0?'+':'') + v.toFixed(1) + '%';
+      varClass = v >= 0 ? 'pos' : 'neg';
+    }
+    return `<tr><td>${r.label}</td><td class="right">${tyStr}</td><td class="right">${lyStr}</td><td class="right"><span class="delta ${varClass}">${varStr}</span></td></tr>`;
+  }).join('');
+}
+
+function getColor(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue('--' + name).trim();
+}
+
+document.querySelectorAll('.tab').forEach(t => {
+  t.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+    t.classList.add('active');
+    if (window.__currentData) renderPeriodTable(window.__currentData, t.dataset.period);
+  });
+});
+
+function parseFile(workbook) {
+  const sheet = workbook.Sheets[workbook.SheetNames[0]];
+  const hotelName = (sheet['B3'] && sheet['B3'].v) ? String(sheet['B3'].v) : 'Hotel';
+  const dateCell = sheet['D7'];
+  let businessDate = null;
+  if (dateCell) {
+    if (dateCell.t === 'd') businessDate = dateCell.v;
+    else if (typeof dateCell.v === 'number') businessDate = XLSX.SSF.parse_date_code(dateCell.v);
+    else businessDate = dateCell.w || dateCell.v;
+  }
+  const g = (ref) => getCell(sheet, ref);
+  const data = {
+    hotelName, businessDate, currency: 'AED',
+    saleable: g('F38') || 0,
+    ooo: (g('F41') || 0) + (g('F44') || 0),
+    oooLY: (g('V41') || 0) + (g('V44') || 0),
+    houseUse: g('F31') || 0,
+    houseUseLY: g('V31') || 0,
+    roomsOccupied: g('F34'),
+    roomsOccupiedLY: g('V34'),
+    occupancy: g('F59'), occupancyLY: g('V59'),
+    occupancyMTD: g('L59'), occupancyMTDLY: g('Y59'),
+    occupancyYTD: g('R59'), occupancyYTDLY: g('AA59'),
+    arrivals: g('F47'), arrivalsLY: g('V47'),
+    departures: g('F53'), departuresLY: g('V53'),
+    roomRev: g('F74'), roomRevLY: g('V74'),
+    fbRev: g('F77'), fbRevLY: g('V77'),
+    minorRev: g('F80'), minorRevLY: g('V80'),
+    taxes: g('F155'), taxesLY: g('V155'),
+    arr: g('F83'), arrLY: g('V83'),
+    revpar: g('F92'), revparLY: g('V92'),
+    guests: g('F22'), guestsLY: g('V22'),
+    revPerGuest: g('F71'), revPerGuestLY: g('V71'),
+  };
+  data.vacant = data.saleable - data.roomsOccupied;
+  data.vacantLY = (g('V38') || 0) - data.roomsOccupiedLY;
+  ['today','mtd','ytd'].forEach(p => {
+    data['occupancy_'+p] = p === 'today' ? data.occupancy : (p === 'mtd' ? data.occupancyMTD : data.occupancyYTD);
+    data['occupancyLY_'+p] = p === 'today' ? data.occupancyLY : (p === 'mtd' ? data.occupancyMTDLY : data.occupancyYTDLY);
+    ['roomsOccupied','roomsOccupiedLY','guests','guestsLY','roomRev','roomRevLY','fbRev','fbRevLY','arr','arrLY','revpar','revparLY','revPerGuest','revPerGuestLY'].forEach(k => {
+      data[k+'_'+p] = data[k];
+    });
+  });
+  return data;
+}
+
+document.getElementById('fileInput').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    try {
+      const wb = XLSX.read(ev.target.result, { type: 'array', cellDates: true });
+      const data = parseFile(wb);
+      renderDashboard(data);
+    } catch (err) {
+      alert('Could not read file: ' + err.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+});
+
+document.getElementById('loadSampleBtn').addEventListener('click', () => {
+  const data = {
+    hotelName: 'Donatello Hotel',
+    businessDate: new Date(2026, 3, 22),
+    currency: 'AED',
+    saleable: 121, ooo: 11, houseUse: 2,
+    roomsOccupied: 103, roomsOccupiedLY: 116, oooLY: 8, houseUseLY: 1,
+    occupancy: 85.124, occupancyLY: 93.5484,
+    occupancyMTD: 87.5937, occupancyMTDLY: 95.6007,
+    occupancyYTD: 86.556, occupancyYTDLY: 92.8628,
+    arrivals: 16, arrivalsLY: 23,
+    departures: 11, departuresLY: 19,
+    roomRev: 11549, roomRevLY: 19872.63,
+    fbRev: 1558.79, fbRevLY: 6213.81,
+    minorRev: 15430.56, minorRevLY: 11067.76,
+    taxes: 2612.30, taxesLY: 5347.15,
+    arr: 112.1262, arrLY: 171.3157,
+    revpar: 95.4462, revparLY: 160.2631,
+    guests: 187, guestsLY: 239,
+    revPerGuest: 160.42, revPerGuestLY: 167.89,
+  };
+  data.vacant = data.saleable - data.roomsOccupied;
+  data.vacantLY = 124 - data.roomsOccupiedLY;
+  ['today','mtd','ytd'].forEach(p => {
+    data['occupancy_'+p] = p==='today'?data.occupancy:(p==='mtd'?data.occupancyMTD:data.occupancyYTD);
+    data['occupancyLY_'+p] = p==='today'?data.occupancyLY:(p==='mtd'?data.occupancyMTDLY:data.occupancyYTDLY);
+    ['roomsOccupied','roomsOccupiedLY','guests','guestsLY','roomRev','roomRevLY','fbRev','fbRevLY','arr','arrLY','revpar','revparLY','revPerGuest','revPerGuestLY'].forEach(k => {
+      data[k+'_'+p] = data[k];
+    });
+  });
+  renderDashboard(data);
+});
+
+document.getElementById('downloadBtn').addEventListener('click', () => {
+  const dash = document.getElementById('dashboard');
+  html2canvas(dash, { backgroundColor: '#ffffff', scale: 2 }).then(canvas => {
+    const link = document.createElement('a');
+    const hotel = (window.__currentData?.hotelName || 'hotel').replace(/[^a-z0-9]/gi, '_');
+    const date = new Date().toISOString().split('T')[0];
+    link.download = `${hotel}_dashboard_${date}.jpg`;
+    link.href = canvas.toDataURL('image/jpeg', 0.95);
+    link.click();
+  });
+});
+</script>
+</body>
+</html>
