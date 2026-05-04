@@ -250,12 +250,11 @@
       <div class="kpi"><div class="kpi-label">Occupancy rate</div><div class="kpi-value" id="occ-val">—</div><div class="kpi-foot"><span class="delta" id="occ-delta">—</span><span class="ly-label" id="occ-ly">LY —</span></div></div>
       <div class="kpi"><div class="kpi-label">Rooms occupied</div><div class="kpi-value" id="rooms-val">—</div><div class="kpi-foot"><span class="delta" id="rooms-delta">—</span><span class="ly-label" id="rooms-ly">LY —</span></div></div>
       <div class="kpi"><div class="kpi-label">Vacant rooms</div><div class="kpi-value" id="vacant-val">—</div><div class="kpi-foot"><span class="delta" id="vacant-delta">—</span><span class="ly-label" id="vacant-ly">LY —</span></div></div>
-      <div class="kpi"><div class="kpi-label">Out of order</div><div class="kpi-value" id="ooo-val">—</div><div class="kpi-foot"><span class="delta" id="ooo-delta">—</span><span class="ly-label" id="ooo-ly">LY —</span></div></div>
+      <div class="kpi"><div class="kpi-label">Arrivals today</div><div class="kpi-value" id="arr-val">—</div><div class="kpi-foot"><span class="delta" id="arr-delta">—</span><span class="ly-label" id="arr-ly">LY —</span></div></div>
     </div>
     <div class="kpi-grid">
-      <div class="kpi"><div class="kpi-label">Arrivals today</div><div class="kpi-value" id="arr-val">—</div><div class="kpi-foot"><span class="delta" id="arr-delta">—</span><span class="ly-label" id="arr-ly">LY —</span></div></div>
       <div class="kpi"><div class="kpi-label">Departures today</div><div class="kpi-value" id="dep-val">—</div><div class="kpi-foot"><span class="delta" id="dep-delta">—</span><span class="ly-label" id="dep-ly">LY —</span></div></div>
-      <div></div><div></div>
+      <div></div><div></div><div></div>
     </div>
 
     <div class="section-title">Revenue — Today</div>
@@ -531,9 +530,9 @@ function renderDashboard(data) {
   }
   document.getElementById('metaLine').textContent = `Manager's flash report · ${dateStr} · Currency: ${data.currency}`;
 
-  document.getElementById('occ-val').textContent = fmt.pct(data.occupancy);
+  document.getElementById('occ-val').textContent = fmt.pct(data.occupancy, 2);
   setDelta('occ-delta', data.occupancy - data.occupancyLY, false, true);
-  document.getElementById('occ-ly').textContent = `LY ${fmt.pct(data.occupancyLY)}`;
+  document.getElementById('occ-ly').textContent = `LY ${fmt.pct(data.occupancyLY, 2)}`;
 
   document.getElementById('rooms-val').textContent = fmt.num(data.roomsOccupied);
   setDelta('rooms-delta', data.roomsOccupied - data.roomsOccupiedLY);
@@ -542,10 +541,6 @@ function renderDashboard(data) {
   document.getElementById('vacant-val').textContent = fmt.num(data.vacant);
   setDelta('vacant-delta', data.vacant - data.vacantLY, false, false, false);
   document.getElementById('vacant-ly').textContent = `LY ${fmt.num(data.vacantLY)}`;
-
-  document.getElementById('ooo-val').textContent = fmt.num(data.ooo);
-  setDelta('ooo-delta', data.ooo - data.oooLY, false, false, false);
-  document.getElementById('ooo-ly').textContent = `LY ${fmt.num(data.oooLY)}`;
 
   document.getElementById('arr-val').textContent = fmt.num(data.arrivals);
   setDelta('arr-delta', data.arrivals - data.arrivalsLY);
@@ -571,7 +566,8 @@ function renderDashboard(data) {
   setDelta('revpar-delta', data.revparLY ? ((data.revpar - data.revparLY) / data.revparLY) * 100 : 0, true);
   document.getElementById('revpar-ly').textContent = `LY ${fmt.money(data.revparLY, data.currency, 2)}`;
 
-  const totalInv = data.saleable + data.ooo + data.houseUse;
+  // Use total inventory directly if provided, else compute from parts
+  const totalInv = data.totalRooms || (data.roomsOccupied + data.vacant + data.ooo + data.houseUse);
   const occ = data.roomsOccupied;
   const vac = data.vacant;
   const ooo = data.ooo;
@@ -598,23 +594,22 @@ function renderDashboard(data) {
   `;
   document.getElementById('totalInv').textContent = `Total inventory: ${totalInv} rooms`;
 
-  const totalRev = data.roomRev + data.fbRev + data.minorRev + data.taxes;
+  const totalRev = data.roomRev + data.fbRev + data.minorRev;
   const pct = (n) => totalRev > 0 ? (n/totalRev*100) : 0;
   document.getElementById('revLegend').innerHTML = `
     <span><span class="legend-dot" style="background:${getColor('blue')}"></span>Rooms ${pct(data.roomRev).toFixed(1)}%</span>
     <span><span class="legend-dot" style="background:${getColor('green')}"></span>F&amp;B ${pct(data.fbRev).toFixed(1)}%</span>
     <span><span class="legend-dot" style="background:${getColor('purple')}"></span>Minor ${pct(data.minorRev).toFixed(1)}%</span>
-    <span><span class="legend-dot" style="background:${getColor('amber')}"></span>Taxes ${pct(data.taxes).toFixed(1)}%</span>
   `;
 
   if (chart1) chart1.destroy();
   chart1 = new Chart(document.getElementById('donutChart'), {
     type: 'doughnut',
     data: {
-      labels: ['Rooms', 'F&B', 'Minor', 'Taxes'],
+      labels: ['Rooms', 'F&B', 'Minor'],
       datasets: [{
-        data: [data.roomRev, data.fbRev, data.minorRev, data.taxes],
-        backgroundColor: [getColor('blue'), getColor('green'), getColor('purple'), getColor('amber')],
+        data: [data.roomRev, data.fbRev, data.minorRev],
+        backgroundColor: [getColor('blue'), getColor('green'), getColor('purple')],
         borderWidth: 0
       }]
     },
@@ -694,6 +689,16 @@ document.querySelectorAll('.tab').forEach(t => {
   });
 });
 
+// Manager's Report (Donatello / "manager_flash" template) format
+//
+// Hotel name in B3, date in D7.
+// Today values in column F, MTD in L, YTD in R.
+// Last Year — Today in V, MTD in Y, YTD in AA.
+//
+// Updated cell mappings per Milind's brief:
+//   Rooms Occupied: F25 (was F34) — uses "Rooms Occupied - Comps&HU" row
+//   Occupancy %:    F62 (was F59) — uses "% Rooms Occupied-Comp/HU" row
+//   ARR:            F86 (was F83) — uses "ARR without Comps" row
 function parseFile(workbook) {
   const sheet = workbook.Sheets[workbook.SheetNames[0]];
   const hotelName = (sheet['B3'] && sheet['B3'].v) ? String(sheet['B3'].v) : 'Hotel';
@@ -704,39 +709,59 @@ function parseFile(workbook) {
     else if (typeof dateCell.v === 'number') businessDate = XLSX.SSF.parse_date_code(dateCell.v);
     else businessDate = dateCell.w || dateCell.v;
   }
+
   const g = (ref) => getCell(sheet, ref);
+  const num = (ref) => { const v = g(ref); return (typeof v === 'number') ? v : (parseFloat(v) || 0); };
+
   const data = {
     hotelName, businessDate, currency: 'AED',
-    saleable: g('F38') || 0,
-    ooo: (g('F41') || 0) + (g('F44') || 0),
-    oooLY: (g('V41') || 0) + (g('V44') || 0),
-    houseUse: g('F31') || 0,
-    houseUseLY: g('V31') || 0,
-    roomsOccupied: g('F34'),
-    roomsOccupiedLY: g('V34'),
-    occupancy: g('F59'), occupancyLY: g('V59'),
-    occupancyMTD: g('L59'), occupancyMTDLY: g('Y59'),
-    occupancyYTD: g('R59'), occupancyYTDLY: g('AA59'),
-    arrivals: g('F47'), arrivalsLY: g('V47'),
-    departures: g('F53'), departuresLY: g('V53'),
-    roomRev: g('F74'), roomRevLY: g('V74'),
-    fbRev: g('F77'), fbRevLY: g('V77'),
-    minorRev: g('F80'), minorRevLY: g('V80'),
-    taxes: g('F155'), taxesLY: g('V155'),
-    arr: g('F83'), arrLY: g('V83'),
-    revpar: g('F92'), revparLY: g('V92'),
-    guests: g('F22'), guestsLY: g('V22'),
-    revPerGuest: g('F71'), revPerGuestLY: g('V71'),
+
+    // Inventory
+    saleable: num('F38'),
+    ooo: num('F41') + num('F44'),                 // POOO + TOOO (still used by inventory bar)
+    oooLY: num('V41') + num('V44'),
+    houseUse: num('F31'),
+    houseUseLY: num('V31'),
+
+    // KPI tiles (using Milind's updated cells)
+    roomsOccupied: num('F25'),                    // CHANGED: F34 → F25
+    roomsOccupiedLY: num('V25'),
+    occupancy: num('F62'),                        // CHANGED: F59 → F62
+    occupancyLY: num('V62'),
+    arr: num('F86'),                              // CHANGED: F83 → F86
+    arrLY: num('V86'),
+
+    // Other KPIs
+    arrivals: num('F47'),       arrivalsLY: num('V47'),
+    departures: num('F53'),     departuresLY: num('V53'),
+    guests: num('F22'),         guestsLY: num('V22'),
+
+    // Revenue
+    roomRev: num('F74'),        roomRevLY: num('V74'),
+    fbRev: num('F77'),          fbRevLY: num('V77'),
+    minorRev: num('F80'),       minorRevLY: num('V80'),
+    revpar: num('F92'),         revparLY: num('V92'),
+    revPerGuest: num('F71'),    revPerGuestLY: num('V71'),
+
+    // Occupancy chart needs MTD/YTD for both years (from F62 row)
+    occupancyMTD: num('L62'),   occupancyMTDLY: num('Y62'),
+    occupancyYTD: num('R62'),   occupancyYTDLY: num('AA62'),
   };
-  data.vacant = data.saleable - data.roomsOccupied;
-  data.vacantLY = (g('V38') || 0) - data.roomsOccupiedLY;
+
+  // Vacant = saleable - occupied - house use (since F25 occupied excludes Comp/HU)
+  data.vacant = Math.max(0, data.saleable - data.roomsOccupied - data.houseUse);
+  data.vacantLY = Math.max(0, num('V38') - data.roomsOccupiedLY - data.houseUseLY);
+
+  // Period comparison table — only occupancy has real MTD/YTD in this template;
+  // for the other metrics we fall back to Today's values (template doesn't carry them)
   ['today','mtd','ytd'].forEach(p => {
-    data['occupancy_'+p] = p === 'today' ? data.occupancy : (p === 'mtd' ? data.occupancyMTD : data.occupancyYTD);
+    data['occupancy_'+p]   = p === 'today' ? data.occupancy   : (p === 'mtd' ? data.occupancyMTD   : data.occupancyYTD);
     data['occupancyLY_'+p] = p === 'today' ? data.occupancyLY : (p === 'mtd' ? data.occupancyMTDLY : data.occupancyYTDLY);
     ['roomsOccupied','roomsOccupiedLY','guests','guestsLY','roomRev','roomRevLY','fbRev','fbRevLY','arr','arrLY','revpar','revparLY','revPerGuest','revPerGuestLY'].forEach(k => {
       data[k+'_'+p] = data[k];
     });
   });
+
   return data;
 }
 
@@ -757,31 +782,36 @@ document.getElementById('fileInput').addEventListener('change', (e) => {
 });
 
 document.getElementById('loadSampleBtn').addEventListener('click', () => {
+  // Sample data based on Copy_of_manager_flash_MILIND.xlsx (Donatello Hotel)
   const data = {
     hotelName: 'Donatello Hotel',
-    businessDate: new Date(2026, 3, 22),
+    businessDate: new Date(2026, 4, 3),
     currency: 'AED',
-    saleable: 121, ooo: 11, houseUse: 2,
-    roomsOccupied: 103, roomsOccupiedLY: 116, oooLY: 8, houseUseLY: 1,
-    occupancy: 85.124, occupancyLY: 93.5484,
-    occupancyMTD: 87.5937, occupancyMTDLY: 95.6007,
-    occupancyYTD: 86.556, occupancyYTDLY: 92.8628,
-    arrivals: 16, arrivalsLY: 23,
-    departures: 11, departuresLY: 19,
-    roomRev: 11549, roomRevLY: 19872.63,
-    fbRev: 1558.79, fbRevLY: 6213.81,
-    minorRev: 15430.56, minorRevLY: 11067.76,
-    taxes: 2612.30, taxesLY: 5347.15,
-    arr: 112.1262, arrLY: 171.3157,
-    revpar: 95.4462, revparLY: 160.2631,
-    guests: 187, guestsLY: 239,
-    revPerGuest: 160.42, revPerGuestLY: 167.89,
+    // Inventory
+    saleable: 118, ooo: 14, houseUse: 2,
+    roomsOccupied: 111, roomsOccupiedLY: 117,
+    vacant: 5, vacantLY: 6,
+    oooLY: 8,
+    // KPIs Today
+    occupancy: 94.0678, occupancyLY: 94.3548,
+    arrivals: 23, arrivalsLY: 25,
+    departures: 24, departuresLY: 27,
+    guests: 214, guestsLY: 242,
+    // Revenue Today
+    roomRev: 13046.52, roomRevLY: 21399.93,
+    fbRev: 2343.75, fbRevLY: 6058.26,
+    minorRev: 14933.33, minorRevLY: 10570.52,
+    arr: 117.5362, arrLY: 182.9053,
+    revpar: 110.5637, revparLY: 172.58,
+    revPerGuest: 149.7969, revPerGuestLY: 170.065,
+    // Occupancy chart
+    occupancyMTD: 92.1348, occupancyMTDLY: 96.2366,
+    occupancyYTD: 84.9987, occupancyYTDLY: 92.8058,
   };
-  data.vacant = data.saleable - data.roomsOccupied;
-  data.vacantLY = 124 - data.roomsOccupiedLY;
+  // Period comparison — only occupancy has real MTD/YTD; rest mirrors today
   ['today','mtd','ytd'].forEach(p => {
-    data['occupancy_'+p] = p==='today'?data.occupancy:(p==='mtd'?data.occupancyMTD:data.occupancyYTD);
-    data['occupancyLY_'+p] = p==='today'?data.occupancyLY:(p==='mtd'?data.occupancyMTDLY:data.occupancyYTDLY);
+    data['occupancy_'+p]   = p === 'today' ? data.occupancy   : (p === 'mtd' ? data.occupancyMTD   : data.occupancyYTD);
+    data['occupancyLY_'+p] = p === 'today' ? data.occupancyLY : (p === 'mtd' ? data.occupancyMTDLY : data.occupancyYTDLY);
     ['roomsOccupied','roomsOccupiedLY','guests','guestsLY','roomRev','roomRevLY','fbRev','fbRevLY','arr','arrLY','revpar','revparLY','revPerGuest','revPerGuestLY'].forEach(k => {
       data[k+'_'+p] = data[k];
     });
