@@ -254,7 +254,8 @@
     </div>
     <div class="kpi-grid">
       <div class="kpi"><div class="kpi-label">Departures today</div><div class="kpi-value" id="dep-val">—</div><div class="kpi-foot"><span class="delta" id="dep-delta">—</span><span class="ly-label" id="dep-ly">LY —</span></div></div>
-      <div></div><div></div><div></div>
+      <div class="kpi"><div class="kpi-label">Total Day Revenue</div><div class="kpi-value" id="totalday-val">—</div><div class="kpi-foot"><span class="delta" id="totalday-delta">—</span><span class="ly-label" id="totalday-ly">LY —</span></div></div>
+      <div></div><div></div>
     </div>
 
     <div class="section-title">Revenue — Today</div>
@@ -549,6 +550,13 @@ function renderDashboard(data) {
   document.getElementById('dep-val').textContent = fmt.num(data.departures);
   setDelta('dep-delta', data.departures - data.departuresLY);
   document.getElementById('dep-ly').textContent = `LY ${fmt.num(data.departuresLY)}`;
+
+  // Total Day Revenue = Room Revenue (F74) + F&B Revenue (F77)
+  const totalDay = (data.roomRev || 0) + (data.fbRev || 0);
+  const totalDayLY = (data.roomRevLY || 0) + (data.fbRevLY || 0);
+  document.getElementById('totalday-val').textContent = fmt.money(totalDay, data.currency);
+  setDelta('totalday-delta', totalDayLY ? ((totalDay - totalDayLY) / totalDayLY) * 100 : 0, true);
+  document.getElementById('totalday-ly').textContent = `LY ${fmt.money(totalDayLY, data.currency)}`;
 
   document.getElementById('rrev-val').textContent = fmt.money(data.roomRev, data.currency);
   setDelta('rrev-delta', data.roomRevLY ? ((data.roomRev - data.roomRevLY) / data.roomRevLY) * 100 : 0, true);
