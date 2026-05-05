@@ -102,6 +102,32 @@
   }
   .logout-btn:hover { background: var(--soft); }
 
+  /* HOTEL PICKER */
+  .hotel-picker {
+    max-width: 1100px; margin: 24px auto; padding: 32px; background: white;
+    border: 1px solid var(--line); border-radius: 12px;
+  }
+  .picker-inner h2 { margin: 0 0 4px; font-weight: 600; font-size: 22px; }
+  .picker-sub { color: var(--muted); margin: 0 0 24px; max-width: 640px; line-height: 1.5; }
+  .picker-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 16px;
+  }
+  .picker-card {
+    background: white; border: 1px solid var(--line); border-radius: 10px;
+    padding: 24px 20px; cursor: pointer; transition: all 0.15s;
+    display: flex; flex-direction: column; align-items: center; gap: 16px;
+    text-align: center; min-height: 180px; justify-content: center;
+  }
+  .picker-card:hover {
+    border-color: var(--ink); transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.06);
+  }
+  .picker-card img { max-height: 80px; max-width: 160px; object-fit: contain; }
+  .picker-card .picker-name {
+    font-weight: 600; font-size: 14px; color: var(--ink);
+  }
+
   /* UPLOADER */
   .uploader {
     max-width: 1100px; margin: 24px auto; padding: 24px; background: white;
@@ -224,19 +250,24 @@
   <div class="topbar">
     <div class="topbar-left">
       <img class="topbar-logo" id="topbarLogo" src="" alt="">
-      Hotel Dashboard
+      <span id="topbarHotelName">Hotel Dashboard</span>
     </div>
     <div class="topbar-right">
       <span class="user-tag">Signed in as <strong id="currentUser">—</strong></span>
-      <label class="logout-btn" style="cursor: pointer;">
-        Change logo
-        <input type="file" id="logoUpload" accept="image/*" style="display:none">
-      </label>
+      <button class="logout-btn" id="switchHotelBtn" style="display:none">Switch hotel</button>
       <button class="logout-btn" id="logoutBtn">Sign out</button>
     </div>
   </div>
 
-  <div class="uploader">
+  <div id="hotelPicker" class="hotel-picker">
+    <div class="picker-inner">
+      <h2>Choose a property</h2>
+      <p class="picker-sub">Select the hotel you want to view the dashboard for. The same uploaded report can be viewed under any property &mdash; the figures stay the same, only the branding changes.</p>
+      <div class="picker-grid" id="pickerGrid"></div>
+    </div>
+  </div>
+
+  <div class="uploader" id="uploader" style="display:none">
     <h2>Upload Manager's Report</h2>
     <p>Drop your <code>Manager_Reports.xls</code> file to generate the dashboard. Files are processed locally in your browser — nothing is uploaded to any server.</p>
     <label class="file-input">
@@ -376,42 +407,64 @@ function getUserLogo(username) {
   return LOGOS[u] || null;
 }
 
-function applyLogoForUser(username) {
-  const lg = getUserLogo(username);
-  const topbar = document.getElementById('topbarLogo');
-  const header = document.getElementById('headerLogo');
-  if (lg) {
-    if (topbar) topbar.src = lg.dashboard;
-    if (header) header.src = lg.dashboard;
-  } else {
-    if (topbar) topbar.src = '';
-    if (header) header.src = '';
+// Hotel picker — shown after login. User chooses a hotel here, then the
+// dashboard renders with that hotel's logo and name. The current hotel
+// can be changed at any time via the "Switch hotel" button in the topbar.
+function showHotelPicker() {
+  const grid = document.getElementById('pickerGrid');
+  if (grid) {
+    grid.innerHTML = Object.entries(HOTEL_REGISTRY)
+      // Filter out duplicates: 'admin' and 'donatello' both map to Donatello;
+      // for the picker UX, dedupe by hotel display name so "Donatello Hotel"
+      // appears once. We pick the first key encountered for each name.
+      .filter((entry, idx, arr) => {
+        const name = entry[1].name;
+        return arr.findIndex(e => e[1].name === name) === idx;
+      })
+      .map(([key, info]) => `
+        <div class="picker-card" data-hotel="${key}">
+          <img src="${info.logo}" alt="${info.name}">
+          <div class="picker-name">${info.name}</div>
+        </div>
+      `).join('');
+    // Wire click handlers
+    grid.querySelectorAll('.picker-card').forEach(card => {
+      card.addEventListener('click', () => selectHotel(card.dataset.hotel));
+    });
+  }
+  document.getElementById('hotelPicker').style.display = 'block';
+  document.getElementById('uploader').style.display = 'none';
+  const dash = document.getElementById('dashboard');
+  if (dash) dash.classList.add('hidden');
+  document.getElementById('switchHotelBtn').style.display = 'none';
+  // Clear topbar branding while on picker
+  document.getElementById('topbarLogo').src = '';
+  document.getElementById('topbarHotelName').textContent = 'Hotel Dashboard';
+}
+
+function selectHotel(hotelKey) {
+  const info = HOTEL_REGISTRY[hotelKey];
+  if (!info) return;
+  window.__currentHotel = info;
+  // Apply branding to topbar and dashboard header
+  document.getElementById('topbarLogo').src = info.logo;
+  document.getElementById('topbarHotelName').textContent = info.name;
+  const headerLogo = document.getElementById('headerLogo');
+  if (headerLogo) headerLogo.src = info.logo;
+  // Show uploader + switch button, hide picker
+  document.getElementById('hotelPicker').style.display = 'none';
+  document.getElementById('uploader').style.display = 'block';
+  document.getElementById('switchHotelBtn').style.display = 'inline-block';
+  // If a dashboard was already rendered, re-render so the new branding applies
+  // (header text + logo) without forcing the user to re-upload the file.
+  if (window.__currentData) {
+    renderDashboard(window.__currentData);
   }
 }
 
-// "Change logo" upload handler: read file as data URL and save to localStorage
-// for the current user. This persists across sessions on this device only.
-document.getElementById('logoUpload').addEventListener('change', (e) => {
-  const file = e.target.files[0];
-  if (!file) return;
-  if (file.size > 500 * 1024) {
-    alert('Please use a logo under 500 KB. Try resizing the image.');
-    return;
-  }
-  const reader = new FileReader();
-  reader.onload = (ev) => {
-    const dataUri = ev.target.result;
-    const session = getSession();
-    if (!session) return;
-    try {
-      localStorage.setItem('hfr_logo_' + session.user, dataUri);
-      applyLogoForUser(session.user);
-      alert('Logo updated. It will appear on this device whenever you sign in.');
-    } catch (err) {
-      alert('Could not save logo: ' + err.message);
-    }
-  };
-  reader.readAsDataURL(file);
+// "Switch hotel" button — return to picker without losing the loaded data
+document.getElementById('switchHotelBtn').addEventListener('click', () => {
+  showHotelPicker();
 });
 
 // ============================================================
@@ -426,12 +479,9 @@ document.getElementById('logoUpload').addEventListener('change', (e) => {
 
 const USERS = {
   // username : sha256(password)
+  // Logins are decoupled from hotels — any logged-in user can pick any hotel.
   'admin':     '8b3ce0c3977ee6e8d53efeb1fb5b4f82bfb85e44b706c4eded197bd78875da67', // password: admin@2026
   'donatello': '0aa6aa6a97fc2ccb4000f87bd9e93a2125582ff044a106c3418d95c04fbc7cae', // password: hotel123
-  'avenue':    '53198ead464a6a48b31e6ca4d3221b30bd57968e0e242ac7da1ec2b595418e09', // password: avenue@2026
-  'grand':     '6f19339f66dbca087ed536ddd5844cd5d3b012287bf03718d6f688158b308496', // password: grand@2026
-  'retreat':   '305714e73b1c3f423be5df709964e5eab32ab3bb703ce91ede4219e3792af01c', // password: retreat@2026
-  'hotels':    'a26b8b742e388c6b26912a473d3b5adfce4711c4f31e261d556b5c2d009ce40e', // password: hotels@2026
   'manager':   '2e064c30dfe840ff76432c401a0d0c19f0b30d823f60fd378353a6a63e431e75', // password: manager2026
 };
 
@@ -477,10 +527,8 @@ function showApp(username) {
   document.getElementById('loginScreen').classList.add('hidden');
   document.getElementById('app').classList.remove('hidden');
   document.getElementById('currentUser').textContent = username;
-  // Remember which hotel this session belongs to — used to override the
-  // dashboard header name so the brand matches the logged-in user.
-  window.__currentHotel = HOTEL_REGISTRY[username] || null;
-  if (typeof applyLogoForUser === 'function') applyLogoForUser(username);
+  // Show the hotel-picker first; dashboard appears only after a hotel is chosen.
+  showHotelPicker();
 }
 function showLogin() {
   document.getElementById('loginScreen').classList.remove('hidden');
