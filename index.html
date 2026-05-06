@@ -617,47 +617,47 @@ function renderDashboard(data) {
   document.getElementById('metaLine').textContent = `Dashboard · ${dateStr} · Currency: ${data.currency}`;
 
   document.getElementById('occ-val').textContent = fmt.pct(data.occupancy, 2);
-  setDelta('occ-delta', data.occupancy - data.occupancyLY, false, true);
-  document.getElementById('occ-ly').textContent = `LY ${fmt.pct(data.occupancyLY, 2)}`;
+  setDelta('occ-delta', data.occupancyLY ? data.occupancy - data.occupancyLY : null, false, true);
+  document.getElementById('occ-ly').textContent = data.occupancyLY ? `LY ${fmt.pct(data.occupancyLY, 2)}` : 'LY —';
 
   document.getElementById('rooms-val').textContent = fmt.num(data.roomsOccupied);
-  setDelta('rooms-delta', data.roomsOccupied - data.roomsOccupiedLY);
-  document.getElementById('rooms-ly').textContent = `LY ${fmt.num(data.roomsOccupiedLY)}`;
+  setDelta('rooms-delta', data.roomsOccupiedLY ? data.roomsOccupied - data.roomsOccupiedLY : null);
+  document.getElementById('rooms-ly').textContent = data.roomsOccupiedLY ? `LY ${fmt.num(data.roomsOccupiedLY)}` : 'LY —';
 
   document.getElementById('vacant-val').textContent = fmt.num(data.vacant);
-  setDelta('vacant-delta', data.vacant - data.vacantLY, false, false, false);
-  document.getElementById('vacant-ly').textContent = `LY ${fmt.num(data.vacantLY)}`;
+  setDelta('vacant-delta', data.vacantLY ? data.vacant - data.vacantLY : null, false, false, false);
+  document.getElementById('vacant-ly').textContent = data.vacantLY ? `LY ${fmt.num(data.vacantLY)}` : 'LY —';
 
   document.getElementById('arr-val').textContent = fmt.num(data.arrivals);
-  setDelta('arr-delta', data.arrivals - data.arrivalsLY);
-  document.getElementById('arr-ly').textContent = `LY ${fmt.num(data.arrivalsLY)}`;
+  setDelta('arr-delta', data.arrivalsLY ? data.arrivals - data.arrivalsLY : null);
+  document.getElementById('arr-ly').textContent = data.arrivalsLY ? `LY ${fmt.num(data.arrivalsLY)}` : 'LY —';
 
   document.getElementById('dep-val').textContent = fmt.num(data.departures);
-  setDelta('dep-delta', data.departures - data.departuresLY);
-  document.getElementById('dep-ly').textContent = `LY ${fmt.num(data.departuresLY)}`;
+  setDelta('dep-delta', data.departuresLY ? data.departures - data.departuresLY : null);
+  document.getElementById('dep-ly').textContent = data.departuresLY ? `LY ${fmt.num(data.departuresLY)}` : 'LY —';
 
   // Total Day Revenue = Room Revenue (F74) + F&B Revenue (F77)
   const totalDay = (data.roomRev || 0) + (data.fbRev || 0);
   const totalDayLY = (data.roomRevLY || 0) + (data.fbRevLY || 0);
   document.getElementById('totalday-val').textContent = fmt.money(totalDay, data.currency);
-  setDelta('totalday-delta', totalDayLY ? ((totalDay - totalDayLY) / totalDayLY) * 100 : 0, true);
-  document.getElementById('totalday-ly').textContent = `LY ${fmt.money(totalDayLY, data.currency)}`;
+  setDelta('totalday-delta', totalDayLY ? ((totalDay - totalDayLY) / totalDayLY) * 100 : null, true);
+  document.getElementById('totalday-ly').textContent = totalDayLY ? `LY ${fmt.money(totalDayLY, data.currency)}` : 'LY —';
 
   document.getElementById('rrev-val').textContent = fmt.money(data.roomRev, data.currency);
-  setDelta('rrev-delta', data.roomRevLY ? ((data.roomRev - data.roomRevLY) / data.roomRevLY) * 100 : 0, true);
-  document.getElementById('rrev-ly').textContent = `LY ${fmt.money(data.roomRevLY, data.currency)}`;
+  setDelta('rrev-delta', data.roomRevLY ? ((data.roomRev - data.roomRevLY) / data.roomRevLY) * 100 : null, true);
+  document.getElementById('rrev-ly').textContent = data.roomRevLY ? `LY ${fmt.money(data.roomRevLY, data.currency)}` : 'LY —';
 
   document.getElementById('fbrev-val').textContent = fmt.money(data.fbRev, data.currency);
-  setDelta('fbrev-delta', data.fbRevLY ? ((data.fbRev - data.fbRevLY) / data.fbRevLY) * 100 : 0, true);
-  document.getElementById('fbrev-ly').textContent = `LY ${fmt.money(data.fbRevLY, data.currency)}`;
+  setDelta('fbrev-delta', data.fbRevLY ? ((data.fbRev - data.fbRevLY) / data.fbRevLY) * 100 : null, true);
+  document.getElementById('fbrev-ly').textContent = data.fbRevLY ? `LY ${fmt.money(data.fbRevLY, data.currency)}` : 'LY —';
 
   document.getElementById('arr2-val').textContent = fmt.money(data.arr, data.currency, 2);
-  setDelta('arr2-delta', data.arrLY ? ((data.arr - data.arrLY) / data.arrLY) * 100 : 0, true);
-  document.getElementById('arr2-ly').textContent = `LY ${fmt.money(data.arrLY, data.currency, 2)}`;
+  setDelta('arr2-delta', data.arrLY ? ((data.arr - data.arrLY) / data.arrLY) * 100 : null, true);
+  document.getElementById('arr2-ly').textContent = data.arrLY ? `LY ${fmt.money(data.arrLY, data.currency, 2)}` : 'LY —';
 
   document.getElementById('revpar-val').textContent = fmt.money(data.revpar, data.currency, 2);
-  setDelta('revpar-delta', data.revparLY ? ((data.revpar - data.revparLY) / data.revparLY) * 100 : 0, true);
-  document.getElementById('revpar-ly').textContent = `LY ${fmt.money(data.revparLY, data.currency, 2)}`;
+  setDelta('revpar-delta', data.revparLY ? ((data.revpar - data.revparLY) / data.revparLY) * 100 : null, true);
+  document.getElementById('revpar-ly').textContent = data.revparLY ? `LY ${fmt.money(data.revparLY, data.currency, 2)}` : 'LY —';
 
   // Use total inventory directly if provided, else compute from parts
   const totalInv = data.totalRooms || (data.roomsOccupied + data.vacant + data.ooo + data.houseUse);
@@ -721,14 +721,21 @@ function renderDashboard(data) {
   document.querySelector('.tab[data-period="today"]').classList.add('active');
 
   if (chart2) chart2.destroy();
+  // If Last Year occupancy data is entirely zero/missing, drop the LY series so
+  // the chart doesn't show a misleading flat line at 0%.
+  const lyOcc = [data.occupancyLY, data.occupancyMTDLY, data.occupancyYTDLY];
+  const hasLY = lyOcc.some(v => v && v > 0);
+  const datasets = [
+    { label: 'This year', data: [data.occupancy, data.occupancyMTD, data.occupancyYTD], backgroundColor: getColor('blue'), borderRadius: 4 },
+  ];
+  if (hasLY) {
+    datasets.push({ label: 'Last year', data: lyOcc, backgroundColor: 'transparent', borderColor: getColor('red'), borderWidth: 2, borderRadius: 4 });
+  }
   chart2 = new Chart(document.getElementById('occChart'), {
     type: 'bar',
     data: {
       labels: ['Today', 'Month to date', 'Year to date'],
-      datasets: [
-        { label: 'This year', data: [data.occupancy, data.occupancyMTD, data.occupancyYTD], backgroundColor: getColor('blue'), borderRadius: 4 },
-        { label: 'Last year', data: [data.occupancyLY, data.occupancyMTDLY, data.occupancyYTDLY], backgroundColor: 'transparent', borderColor: getColor('red'), borderWidth: 2, borderRadius: 4 }
-      ]
+      datasets: datasets
     },
     options: {
       maintainAspectRatio: false,
@@ -753,16 +760,18 @@ function renderPeriodTable(data, period) {
   tbody.innerHTML = rows.map(r => {
     const ty = r.ty, ly = r.ly;
     let tyStr, lyStr, varStr, varClass;
-    if (r.suffix === '%') { tyStr = fmt.pct(ty, 2); lyStr = fmt.pct(ly, 2); }
-    else if (r.money) { tyStr = fmt.money(ty, data.currency, r.decimals||0); lyStr = fmt.money(ly, data.currency, r.decimals||0); }
-    else { tyStr = fmt.num(ty); lyStr = fmt.num(ly); }
-    if (ty == null || ly == null || isNaN(ty) || isNaN(ly)) { varStr = '—'; varClass=''; }
+    // Treat zero LY as missing data (LY column comes through as 0 when source is empty)
+    const lyMissing = (ly == null || isNaN(ly) || ly === 0);
+    if (r.suffix === '%') { tyStr = fmt.pct(ty, 2); lyStr = lyMissing ? '—' : fmt.pct(ly, 2); }
+    else if (r.money) { tyStr = fmt.money(ty, data.currency, r.decimals||0); lyStr = lyMissing ? '—' : fmt.money(ly, data.currency, r.decimals||0); }
+    else { tyStr = fmt.num(ty); lyStr = lyMissing ? '—' : fmt.num(ly); }
+    if (ty == null || lyMissing || isNaN(ty)) { varStr = '—'; varClass=''; }
     else if (r.isPP) {
       const v = ty - ly;
       varStr = (v>=0?'+':'') + v.toFixed(2) + 'pp';
       varClass = v >= 0 ? 'pos' : 'neg';
     } else {
-      const v = ly === 0 ? 0 : ((ty - ly) / ly) * 100;
+      const v = ((ty - ly) / ly) * 100;
       varStr = (v>=0?'+':'') + v.toFixed(1) + '%';
       varClass = v >= 0 ? 'pos' : 'neg';
     }
@@ -782,18 +791,30 @@ document.querySelectorAll('.tab').forEach(t => {
   });
 });
 
-// Manager's Report (Donatello / "manager_flash" template) format
-//
-// Hotel name in B3, date in D7.
-// Today values in column F, MTD in L, YTD in R.
-// Last Year — Today in V, MTD in Y, YTD in AA.
-//
-// Updated cell mappings per Milind's brief:
-//   Rooms Occupied: F25 (was F34) — uses "Rooms Occupied - Comps&HU" row
-//   Occupancy %:    F62 (was F59) — uses "% Rooms Occupied-Comp/HU" row
-//   ARR:            F86 (was F83) — uses "ARR without Comps" row
-function parseFile(workbook) {
-  const sheet = workbook.Sheets[workbook.SheetNames[0]];
+// ============================================================
+// FILE FORMAT PARSERS
+// ============================================================
+// Two report formats are supported:
+//   - "donatello"  : the original manager_flash template
+//   - "luxe"       : Crystal Reports "Manager's Report" used by LUXE properties
+// Both have hotel name in B3 and date in D7 — but the row layout differs.
+// We auto-detect by checking a marker cell that's unique to each format.
+
+// LUXE files have "Saleable Rooms" at row 47; Donatello has it at row 38.
+// We check both — whichever row matches identifies the format.
+function detectFormat(sheet) {
+  const b38 = (sheet['B38'] && sheet['B38'].v) ? String(sheet['B38'].v).trim().toLowerCase() : '';
+  if (b38.startsWith('saleable')) return 'donatello';
+  const b47 = (sheet['B47'] && sheet['B47'].v) ? String(sheet['B47'].v).trim().toLowerCase() : '';
+  if (b47.startsWith('saleable')) return 'luxe';
+  // Fallback heuristic: LUXE format uses "Comps/HU" (slash); Donatello uses "Comps&HU" (ampersand)
+  const b25 = (sheet['B25'] && sheet['B25'].v) ? String(sheet['B25'].v) : '';
+  if (b25.includes('Comps/HU')) return 'luxe';
+  return 'donatello';
+}
+
+// Shared header parsing (hotel name + date)
+function parseHeader(sheet) {
   const hotelName = (sheet['B3'] && sheet['B3'].v) ? String(sheet['B3'].v) : 'Hotel';
   const dateCell = sheet['D7'];
   let businessDate = null;
@@ -802,51 +823,42 @@ function parseFile(workbook) {
     else if (typeof dateCell.v === 'number') businessDate = XLSX.SSF.parse_date_code(dateCell.v);
     else businessDate = dateCell.w || dateCell.v;
   }
+  return { hotelName, businessDate };
+}
 
+// Donatello ("manager_flash") format
+//   Today=F, MTD=L, YTD=R; Last Year Today=V, MTD=Y, YTD=AA
+//   Rooms Occupied F25 | Occupancy F62 | ARR F86 | Room Rev F74 | F&B F77 | Minor F80 | RevPAR F92
+function parseDonatelloFormat(sheet) {
+  const { hotelName, businessDate } = parseHeader(sheet);
   const g = (ref) => getCell(sheet, ref);
   const num = (ref) => { const v = g(ref); return (typeof v === 'number') ? v : (parseFloat(v) || 0); };
 
   const data = {
     hotelName, businessDate, currency: 'AED',
-
-    // Inventory
     saleable: num('F38'),
-    ooo: num('F41') + num('F44'),                 // POOO + TOOO (still used by inventory bar)
+    ooo: num('F41') + num('F44'),
     oooLY: num('V41') + num('V44'),
     houseUse: num('F31'),
     houseUseLY: num('V31'),
-
-    // KPI tiles (using Milind's updated cells)
-    roomsOccupied: num('F25'),                    // CHANGED: F34 → F25
-    roomsOccupiedLY: num('V25'),
-    occupancy: num('F62'),                        // CHANGED: F59 → F62
-    occupancyLY: num('V62'),
-    arr: num('F86'),                              // CHANGED: F83 → F86
-    arrLY: num('V86'),
-
-    // Other KPIs
-    arrivals: num('F47'),       arrivalsLY: num('V47'),
-    departures: num('F53'),     departuresLY: num('V53'),
-    guests: num('F22'),         guestsLY: num('V22'),
-
-    // Revenue
-    roomRev: num('F74'),        roomRevLY: num('V74'),
-    fbRev: num('F77'),          fbRevLY: num('V77'),
-    minorRev: num('F80'),       minorRevLY: num('V80'),
-    revpar: num('F92'),         revparLY: num('V92'),
-    revPerGuest: num('F71'),    revPerGuestLY: num('V71'),
-
-    // Occupancy chart needs MTD/YTD for both years (from F62 row)
-    occupancyMTD: num('L62'),   occupancyMTDLY: num('Y62'),
-    occupancyYTD: num('R62'),   occupancyYTDLY: num('AA62'),
+    roomsOccupied: num('F25'),       roomsOccupiedLY: num('V25'),
+    occupancy: num('F62'),           occupancyLY: num('V62'),
+    arr: num('F86'),                 arrLY: num('V86'),
+    arrivals: num('F47'),            arrivalsLY: num('V47'),
+    departures: num('F53'),          departuresLY: num('V53'),
+    guests: num('F22'),              guestsLY: num('V22'),
+    roomRev: num('F74'),             roomRevLY: num('V74'),
+    fbRev: num('F77'),               fbRevLY: num('V77'),
+    minorRev: num('F80'),            minorRevLY: num('V80'),
+    revpar: num('F92'),              revparLY: num('V92'),
+    revPerGuest: num('F71'),         revPerGuestLY: num('V71'),
+    occupancyMTD: num('L62'),        occupancyMTDLY: num('Y62'),
+    occupancyYTD: num('R62'),        occupancyYTDLY: num('AA62'),
   };
-
-  // Vacant = saleable - occupied - house use (since F25 occupied excludes Comp/HU)
   data.vacant = Math.max(0, data.saleable - data.roomsOccupied - data.houseUse);
   data.vacantLY = Math.max(0, num('V38') - data.roomsOccupiedLY - data.houseUseLY);
 
-  // Period comparison table — only occupancy has real MTD/YTD in this template;
-  // for the other metrics we fall back to Today's values (template doesn't carry them)
+  // Donatello format only carries MTD/YTD for occupancy; other metrics fall back to Today
   ['today','mtd','ytd'].forEach(p => {
     data['occupancy_'+p]   = p === 'today' ? data.occupancy   : (p === 'mtd' ? data.occupancyMTD   : data.occupancyYTD);
     data['occupancyLY_'+p] = p === 'today' ? data.occupancyLY : (p === 'mtd' ? data.occupancyMTDLY : data.occupancyYTDLY);
@@ -854,8 +866,75 @@ function parseFile(workbook) {
       data[k+'_'+p] = data[k];
     });
   });
+  return data;
+}
+
+// LUXE / Crystal Reports format
+//   Today=F, MTD=L, YTD=R; Last Year Today=V, MTD=Y, YTD=AA   (same column scheme)
+//   Rooms Occupied F25 | Occupancy F77 | ARR F116 | Room Rev F104 | F&B F107 | Minor F110 | RevPAR F125
+//   Saleable F47 | OOO F50+F53 | House Use F40 | Arrivals F56 | Departures F62
+function parseLuxeFormat(sheet) {
+  const { hotelName, businessDate } = parseHeader(sheet);
+  const g = (ref) => getCell(sheet, ref);
+  const num = (ref) => { const v = g(ref); return (typeof v === 'number') ? v : (parseFloat(v) || 0); };
+
+  const data = {
+    hotelName, businessDate, currency: 'AED',
+    saleable: num('F47'),
+    ooo: num('F50') + num('F53'),
+    oooLY: num('V50') + num('V53'),
+    houseUse: num('F40'),
+    houseUseLY: num('V40'),
+    roomsOccupied: num('F25'),       roomsOccupiedLY: num('V25'),
+    occupancy: num('F77'),           occupancyLY: num('V77'),
+    arr: num('F116'),                arrLY: num('V116'),
+    arrivals: num('F56'),            arrivalsLY: num('V56'),
+    departures: num('F62'),          departuresLY: num('V62'),
+    guests: num('F22'),              guestsLY: num('V22'),
+    roomRev: num('F104'),            roomRevLY: num('V104'),
+    fbRev: num('F107'),              fbRevLY: num('V107'),
+    minorRev: num('F110'),           minorRevLY: num('V110'),
+    revpar: num('F125'),             revparLY: num('V125'),
+    revPerGuest: num('F101'),        revPerGuestLY: num('V101'),
+    occupancyMTD: num('L77'),        occupancyMTDLY: num('Y77'),
+    occupancyYTD: num('R77'),        occupancyYTDLY: num('AA77'),
+  };
+  data.vacant = Math.max(0, data.saleable - data.roomsOccupied - data.houseUse);
+  data.vacantLY = Math.max(0, num('V47') - data.roomsOccupiedLY - data.houseUseLY);
+
+  // LUXE format DOES carry real MTD and YTD for every metric — fill in real values
+  const periodMap = {
+    today: { ty: 'F',  ly: 'V'  },
+    mtd:   { ty: 'L',  ly: 'Y'  },
+    ytd:   { ty: 'R',  ly: 'AA' },
+  };
+  const rowMap = {
+    occupancy:     '77',
+    roomsOccupied: '25',
+    guests:        '22',
+    roomRev:       '104',
+    fbRev:         '107',
+    arr:           '116',
+    revpar:        '125',
+    revPerGuest:   '101',
+  };
+  ['today','mtd','ytd'].forEach(p => {
+    Object.entries(rowMap).forEach(([metric, row]) => {
+      data[metric+'_'+p]      = num(periodMap[p].ty + row);
+      data[metric+'LY_'+p]    = num(periodMap[p].ly + row);
+    });
+  });
 
   return data;
+}
+
+// Auto-detect format and route to the right parser
+function parseFile(workbook) {
+  const sheet = workbook.Sheets[workbook.SheetNames[0]];
+  const fmt = detectFormat(sheet);
+  console.log('Detected file format:', fmt);
+  if (fmt === 'luxe') return parseLuxeFormat(sheet);
+  return parseDonatelloFormat(sheet);
 }
 
 document.getElementById('fileInput').addEventListener('change', (e) => {
