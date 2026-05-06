@@ -898,14 +898,32 @@ function parseDonatelloFormat(sheet) {
   data.vacant = Math.max(0, data.saleable - data.roomsOccupied - data.houseUse);
   data.vacantLY = Math.max(0, num('V38') - data.roomsOccupiedLY - data.houseUseLY);
 
-  // Donatello format only carries MTD/YTD for occupancy; other metrics fall back to Today
+  // Donatello format carries real MTD and YTD values for every metric:
+  //   This Year:  Today=F, MTD=L, YTD=R
+  //   Last Year:  Today=V, MTD=Y, YTD=AA
+  // Pull the real values rather than repeating Today.
+  const periodMap = {
+    today: { ty: 'F', ly: 'V'  },
+    mtd:   { ty: 'L', ly: 'Y'  },
+    ytd:   { ty: 'R', ly: 'AA' },
+  };
+  const rowMap = {
+    occupancy:     '62',   // % Rooms Occupied-Comp/HU
+    roomsOccupied: '25',   // Rooms Occupied - Comps&HU
+    guests:        '22',   // Guests In-House
+    roomRev:       '74',   // Room Revenue
+    fbRev:         '77',   // F & B Revenue
+    arr:           '86',   // ARR without Comps
+    revpar:        '92',   // Revenue PAR
+    revPerGuest:   '71',   // Revenue per Guest
+  };
   ['today','mtd','ytd'].forEach(p => {
-    data['occupancy_'+p]   = p === 'today' ? data.occupancy   : (p === 'mtd' ? data.occupancyMTD   : data.occupancyYTD);
-    data['occupancyLY_'+p] = p === 'today' ? data.occupancyLY : (p === 'mtd' ? data.occupancyMTDLY : data.occupancyYTDLY);
-    ['roomsOccupied','roomsOccupiedLY','guests','guestsLY','roomRev','roomRevLY','fbRev','fbRevLY','arr','arrLY','revpar','revparLY','revPerGuest','revPerGuestLY'].forEach(k => {
-      data[k+'_'+p] = data[k];
+    Object.entries(rowMap).forEach(([metric, row]) => {
+      data[metric+'_'+p]   = num(periodMap[p].ty + row);
+      data[metric+'LY_'+p] = num(periodMap[p].ly + row);
     });
   });
+
   return data;
 }
 
