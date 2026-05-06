@@ -206,6 +206,30 @@
   th.right, td.right { text-align: right; }
   td { padding: 12px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
   tr:last-child td { border-bottom: none; }
+
+  /* Period comparison table (3 periods side-by-side) */
+  .period-table-wrap { overflow-x: auto; }
+  .period-table { width: 100%; min-width: 720px; }
+  .period-table th, .period-table td { padding: 8px 8px; vertical-align: middle; }
+  .period-table th { font-size: 10px; }
+  .period-table td { font-size: 12px; }
+  .period-table .period-group {
+    text-align: center; padding: 8px 6px; font-weight: 600; font-size: 11px;
+  }
+
+  /* Color-code each period group (header band) */
+  .period-table .period-group.today { background: #f1f5f9; color: #334155; }
+  .period-table .period-group.mtd   { background: #dbeafe; color: #1e40af; }
+  .period-table .period-group.ytd   { background: #fef3c7; color: #92400e; }
+
+  /* Light cell tints applied via cell class (not nth-child) so html2canvas
+     captures them reliably */
+  .period-table .cell-today { background: #fafafa; }
+  .period-table .cell-mtd   { background: #f0f7ff; }
+  .period-table .cell-ytd   { background: #fffbeb; }
+
+  .period-table .delta { font-size: 10px; padding: 1px 5px; white-space: nowrap; }
+
   .chart-wrap { height: 280px; margin-top: 16px; }
 
   @media print { body { background: white; } .uploader, .topbar { display: none; } }
@@ -331,15 +355,24 @@
 
     <div class="card" style="margin-top: 16px;">
       <div class="card-title">Period comparison — this year vs last year</div>
-      <div class="tabs">
-        <div class="tab active" data-period="today">Today</div>
-        <div class="tab" data-period="mtd">Month to date</div>
-        <div class="tab" data-period="ytd">Year to date</div>
+      <div class="period-table-wrap">
+        <table class="period-table">
+          <thead>
+            <tr class="period-group-row">
+              <th rowspan="2">Metric</th>
+              <th colspan="3" class="period-group today">Today</th>
+              <th colspan="3" class="period-group mtd">Month to date</th>
+              <th colspan="3" class="period-group ytd">Year to date</th>
+            </tr>
+            <tr class="period-sub-row">
+              <th class="right cell-today">TY</th><th class="right cell-today">LY</th><th class="right cell-today">Var</th>
+              <th class="right cell-mtd">TY</th><th class="right cell-mtd">LY</th><th class="right cell-mtd">Var</th>
+              <th class="right cell-ytd">TY</th><th class="right cell-ytd">LY</th><th class="right cell-ytd">Var</th>
+            </tr>
+          </thead>
+          <tbody id="compareTable"></tbody>
+        </table>
       </div>
-      <table>
-        <thead><tr><th>Metric</th><th class="right">This year</th><th class="right">Last year</th><th class="right">Var</th></tr></thead>
-        <tbody id="compareTable"></tbody>
-      </table>
     </div>
 
     <div class="card" style="margin-top: 16px;">
@@ -716,9 +749,7 @@ function renderDashboard(data) {
   document.getElementById('revGuestLYVal').textContent = fmt.money(data.revPerGuestLY, data.currency);
 
   window.__currentData = data;
-  renderPeriodTable(data, 'today');
-  document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
-  document.querySelector('.tab[data-period="today"]').classList.add('active');
+  renderPeriodTable(data);
 
   if (chart2) chart2.destroy();
   // If Last Year occupancy data is entirely zero/missing, drop the LY series so
@@ -745,51 +776,60 @@ function renderDashboard(data) {
   });
 }
 
-function renderPeriodTable(data, period) {
-  const rows = [
-    { label: 'Occupancy %', ty: data['occupancy_'+period], ly: data['occupancyLY_'+period], suffix: '%', isPP: true },
-    { label: 'Rooms occupied', ty: data['roomsOccupied_'+period], ly: data['roomsOccupiedLY_'+period] },
-    { label: 'Total guests', ty: data['guests_'+period], ly: data['guestsLY_'+period] },
-    { label: 'Room revenue', ty: data['roomRev_'+period], ly: data['roomRevLY_'+period], money: true },
-    { label: 'F&B revenue', ty: data['fbRev_'+period], ly: data['fbRevLY_'+period], money: true },
-    { label: 'ARR', ty: data['arr_'+period], ly: data['arrLY_'+period], money: true, decimals: 2 },
-    { label: 'RevPAR', ty: data['revpar_'+period], ly: data['revparLY_'+period], money: true, decimals: 2 },
-    { label: 'Revenue/guest', ty: data['revPerGuest_'+period], ly: data['revPerGuestLY_'+period], money: true, decimals: 2 },
+function renderPeriodTable(data) {
+  // Each row: one metric, with TY/LY/Var across Today, MTD, YTD
+  const metrics = [
+    { label: 'Occupancy %',    key: 'occupancy',     suffix: '%', isPP: true },
+    { label: 'Rooms occupied', key: 'roomsOccupied' },
+    { label: 'Total guests',   key: 'guests' },
+    { label: 'Room revenue',   key: 'roomRev',       money: true },
+    { label: 'F&B revenue',    key: 'fbRev',         money: true },
+    { label: 'ARR',            key: 'arr',           money: true, decimals: 2 },
+    { label: 'RevPAR',         key: 'revpar',        money: true, decimals: 2 },
+    { label: 'Revenue/guest',  key: 'revPerGuest',   money: true, decimals: 2 },
   ];
-  const tbody = document.getElementById('compareTable');
-  tbody.innerHTML = rows.map(r => {
-    const ty = r.ty, ly = r.ly;
-    let tyStr, lyStr, varStr, varClass;
-    // Treat zero LY as missing data (LY column comes through as 0 when source is empty)
-    const lyMissing = (ly == null || isNaN(ly) || ly === 0);
-    if (r.suffix === '%') { tyStr = fmt.pct(ty, 2); lyStr = lyMissing ? '—' : fmt.pct(ly, 2); }
-    else if (r.money) { tyStr = fmt.money(ty, data.currency, r.decimals||0); lyStr = lyMissing ? '—' : fmt.money(ly, data.currency, r.decimals||0); }
-    else { tyStr = fmt.num(ty); lyStr = lyMissing ? '—' : fmt.num(ly); }
-    if (ty == null || lyMissing || isNaN(ty)) { varStr = '—'; varClass=''; }
-    else if (r.isPP) {
+  const periods = ['today','mtd','ytd'];
+
+  const formatTY = (val, m) => {
+    if (val == null || isNaN(val)) return '—';
+    if (m.suffix === '%') return fmt.pct(val, 2);
+    if (m.money) return fmt.money(val, data.currency, m.decimals || 0);
+    return fmt.num(val);
+  };
+  const formatLY = (val, m, lyMissing) => {
+    if (lyMissing) return '—';
+    return formatTY(val, m);
+  };
+  const formatVar = (ty, ly, m, lyMissing) => {
+    if (ty == null || lyMissing || isNaN(ty)) return { text: '—', cls: '' };
+    if (m.isPP) {
       const v = ty - ly;
-      varStr = (v>=0?'+':'') + v.toFixed(2) + 'pp';
-      varClass = v >= 0 ? 'pos' : 'neg';
-    } else {
-      const v = ((ty - ly) / ly) * 100;
-      varStr = (v>=0?'+':'') + v.toFixed(1) + '%';
-      varClass = v >= 0 ? 'pos' : 'neg';
+      return { text: (v >= 0 ? '+' : '') + v.toFixed(2) + 'pp', cls: v >= 0 ? 'pos' : 'neg' };
     }
-    return `<tr><td>${r.label}</td><td class="right">${tyStr}</td><td class="right">${lyStr}</td><td class="right"><span class="delta ${varClass}">${varStr}</span></td></tr>`;
+    const v = ((ty - ly) / ly) * 100;
+    return { text: (v >= 0 ? '+' : '') + v.toFixed(1) + '%', cls: v >= 0 ? 'pos' : 'neg' };
+  };
+
+  const tbody = document.getElementById('compareTable');
+  tbody.innerHTML = metrics.map(m => {
+    let cells = '';
+    periods.forEach(p => {
+      const ty = data[m.key + '_' + p];
+      const ly = data[m.key + 'LY_' + p];
+      const lyMissing = (ly == null || isNaN(ly) || ly === 0);
+      const v = formatVar(ty, ly, m, lyMissing);
+      const cellCls = 'right cell-' + p;  // p is 'today', 'mtd', or 'ytd'
+      cells += `<td class="${cellCls}">${formatTY(ty, m)}</td>`
+            +  `<td class="${cellCls}">${formatLY(ly, m, lyMissing)}</td>`
+            +  `<td class="${cellCls}"><span class="delta ${v.cls}">${v.text}</span></td>`;
+    });
+    return `<tr><td>${m.label}</td>${cells}</tr>`;
   }).join('');
 }
 
 function getColor(name) {
   return getComputedStyle(document.documentElement).getPropertyValue('--' + name).trim();
 }
-
-document.querySelectorAll('.tab').forEach(t => {
-  t.addEventListener('click', () => {
-    document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
-    t.classList.add('active');
-    if (window.__currentData) renderPeriodTable(window.__currentData, t.dataset.period);
-  });
-});
 
 // ============================================================
 // FILE FORMAT PARSERS
