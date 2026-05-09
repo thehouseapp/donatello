@@ -936,6 +936,13 @@ function parseLuxeFormat(sheet) {
   const g = (ref) => getCell(sheet, ref);
   const num = (ref) => { const v = g(ref); return (typeof v === 'number') ? v : (parseFloat(v) || 0); };
 
+  // Per Milind: for LUXE Avenue & LUXE Retreat, gross up Room Revenue and
+  // F&B Revenue by 10% on display. Other metrics (ARR, RevPAR, Rev/guest,
+  // Total Day, donut) are NOT scaled, so internal arithmetic on the
+  // dashboard will not reconcile (e.g. ARR × Rooms ≠ Room Rev). This is
+  // an intentional reporting choice, not a bug.
+  const REV_MULTIPLIER = 1.10;
+
   const data = {
     hotelName, businessDate, currency: 'AED',
     saleable: num('F47'),
@@ -949,8 +956,8 @@ function parseLuxeFormat(sheet) {
     arrivals: num('F56'),            arrivalsLY: num('V56'),
     departures: num('F62'),          departuresLY: num('V62'),
     guests: num('F22'),              guestsLY: num('V22'),
-    roomRev: num('F104'),            roomRevLY: num('V104'),
-    fbRev: num('F107'),              fbRevLY: num('V107'),
+    roomRev: num('F104') * REV_MULTIPLIER,    roomRevLY: num('V104') * REV_MULTIPLIER,
+    fbRev:   num('F107') * REV_MULTIPLIER,    fbRevLY:   num('V107') * REV_MULTIPLIER,
     minorRev: num('F110'),           minorRevLY: num('V110'),
     revpar: num('F125'),             revparLY: num('V125'),
     revPerGuest: num('F101'),        revPerGuestLY: num('V101'),
@@ -976,10 +983,13 @@ function parseLuxeFormat(sheet) {
     revpar:        '125',
     revPerGuest:   '101',
   };
+  // Which period-keyed metrics get the 1.10 multiplier
+  const SCALED_METRICS = new Set(['roomRev', 'fbRev']);
   ['today','mtd','ytd'].forEach(p => {
     Object.entries(rowMap).forEach(([metric, row]) => {
-      data[metric+'_'+p]      = num(periodMap[p].ty + row);
-      data[metric+'LY_'+p]    = num(periodMap[p].ly + row);
+      const factor = SCALED_METRICS.has(metric) ? REV_MULTIPLIER : 1;
+      data[metric+'_'+p]      = num(periodMap[p].ty + row) * factor;
+      data[metric+'LY_'+p]    = num(periodMap[p].ly + row) * factor;
     });
   });
 
