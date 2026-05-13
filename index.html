@@ -330,8 +330,8 @@
     <div class="kpi-grid">
       <div class="kpi"><div class="kpi-label">Room revenue</div><div class="kpi-value" id="rrev-val">—</div><div class="kpi-foot"><span class="delta" id="rrev-delta">—</span><span class="ly-label" id="rrev-ly">LY —</span></div></div>
       <div class="kpi"><div class="kpi-label">F&amp;B revenue</div><div class="kpi-value" id="fbrev-val">—</div><div class="kpi-foot"><span class="delta" id="fbrev-delta">—</span><span class="ly-label" id="fbrev-ly">LY —</span></div></div>
+      <div class="kpi"><div class="kpi-label" id="other-label">Other revenue</div><div class="kpi-value" id="other-val">—</div><div class="kpi-foot"><span class="delta" id="other-delta">—</span><span class="ly-label" id="other-ly">LY —</span></div></div>
       <div class="kpi kpi-highlight"><div class="kpi-label">Total Day Revenue</div><div class="kpi-value" id="totalday-val">—</div><div class="kpi-foot"><span class="delta" id="totalday-delta">—</span><span class="ly-label" id="totalday-ly">LY —</span></div></div>
-      <div></div>
     </div>
 
     <div class="row-2">
@@ -671,9 +671,20 @@ function renderDashboard(data) {
   setDelta('dep-delta', data.departuresLY ? data.departures - data.departuresLY : null);
   document.getElementById('dep-ly').textContent = data.departuresLY ? `LY ${fmt.num(data.departuresLY)}` : 'LY —';
 
-  // Total Day Revenue = Room Revenue (F74) + F&B Revenue (F77)
-  const totalDay = (data.roomRev || 0) + (data.fbRev || 0);
-  const totalDayLY = (data.roomRevLY || 0) + (data.fbRevLY || 0);
+  // Other Revenue tile (the "third revenue category" — labeled differently
+  // per source format: "Other Revenue" for Daily Sales / Vendome, "Retail Shop
+  // Revenue" for Donatello / LUXE Hotels). Value is already ×1.10-scaled in
+  // the parser for formats where that rule applies.
+  const otherLabel = data.minorRevLabel || 'Retail Shop Revenue';
+  document.getElementById('other-label').textContent = otherLabel;
+  document.getElementById('other-val').textContent = fmt.money(data.minorRev || 0, data.currency);
+  setDelta('other-delta', data.minorRevLY ? ((data.minorRev - data.minorRevLY) / data.minorRevLY) * 100 : null, true);
+  document.getElementById('other-ly').textContent = data.minorRevLY ? `LY ${fmt.money(data.minorRevLY, data.currency)}` : 'LY —';
+
+  // Total Day Revenue = Room Revenue + F&B Revenue + Other Revenue
+  // (each already ×1.10 in the parser for formats where that rule applies)
+  const totalDay = (data.roomRev || 0) + (data.fbRev || 0) + (data.minorRev || 0);
+  const totalDayLY = (data.roomRevLY || 0) + (data.fbRevLY || 0) + (data.minorRevLY || 0);
   document.getElementById('totalday-val').textContent = fmt.money(totalDay, data.currency);
   setDelta('totalday-delta', totalDayLY ? ((totalDay - totalDayLY) / totalDayLY) * 100 : null, true);
   document.getElementById('totalday-ly').textContent = totalDayLY ? `LY ${fmt.money(totalDayLY, data.currency)}` : 'LY —';
