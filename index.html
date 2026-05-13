@@ -848,10 +848,15 @@ function detectFormat(sheet) {
   // Vendome: A5 contains "TOTAL ROOMS IN HOTEL"
   const a5 = (sheet['A5'] && sheet['A5'].v) ? String(sheet['A5'].v).trim().toLowerCase() : '';
   if (a5.startsWith('total rooms in hotel')) return 'vendome';
+  // Daily Sales Report (Prologic First / Crystal Reports): B4 = "DAILY SALES REPORT"
+  // Used by LUXE Avenue, LUXE Grand, LUXE Retreat
+  const b4 = (sheet['B4'] && sheet['B4'].v) ? String(sheet['B4'].v).trim().toLowerCase() : '';
+  if (b4.startsWith('daily sales report')) return 'dailysales';
   // Donatello: "Saleable Rooms" label sits in B38
   const b38 = (sheet['B38'] && sheet['B38'].v) ? String(sheet['B38'].v).trim().toLowerCase() : '';
   if (b38.startsWith('saleable')) return 'donatello';
-  // LUXE: same "Saleable Rooms" label but in B47
+  // LUXE (Manager's Report — used by LUXE Hotels only now):
+  //   "Saleable Rooms" label in B47
   const b47 = (sheet['B47'] && sheet['B47'].v) ? String(sheet['B47'].v).trim().toLowerCase() : '';
   if (b47.startsWith('saleable')) return 'luxe';
   // Fallback heuristic: LUXE format uses "Comps/HU" (slash); Donatello uses "Comps&HU" (ampersand)
@@ -1003,6 +1008,125 @@ function parseLuxeFormat(sheet) {
   return data;
 }
 
+// Daily Sales Report (Prologic First / Crystal Reports "Summary of Sales")
+// Used by LUXE Avenue, LUXE Grand, LUXE Retreat (NOT LUXE Hotels — that stays
+// on the Manager's Report / LUXE format).
+//
+// Layout:
+//   B2 = Hotel name, D6 = Business date
+//   TY: Today=F (G for revenue totals), MTD=J, YTD=R
+//   LY: Today=X, MTD=AA, YTD=AF
+//
+// Per Milind's annotations on the computation file, four metrics gross up by 1.10:
+//   - Room Revenue (F56)
+//   - Total F&B (G75)
+//   - Total Other Revenue (G93)
+//   - ARR (F37)
+// Other metrics (occupancy %, RevPAR, room counts, arrivals/departures) are unchanged.
+function parseDailySalesFormat(sheet) {
+  const g = (ref) => getCell(sheet, ref);
+  const num = (ref) => { const v = g(ref); return (typeof v === 'number') ? v : (parseFloat(v) || 0); };
+
+  const REV_MULT = 1.10;
+
+  // Header
+  const hotelName = (sheet['B2'] && sheet['B2'].v) ? String(sheet['B2'].v) : 'Hotel';
+  const dateCell = sheet['D6'];
+  let businessDate = null;
+  if (dateCell) {
+    if (dateCell.t === 'd') businessDate = dateCell.v;
+    else if (typeof dateCell.v === 'number') businessDate = XLSX.SSF.parse_date_code(dateCell.v);
+    else businessDate = dateCell.w || dateCell.v;
+  }
+
+  const data = {
+    hotelName, businessDate, currency: 'AED',
+
+    // Inventory snapshot (Today)
+    saleable: num('F17'),                  // Rooms Available for Sale
+    ooo: num('F13'),                       // Out Of Order
+    oooLY: num('X13'),
+    houseUse: num('F19'),                  // House Use
+    houseUseLY: num('X19'),
+    // "Rooms Occupied" tile uses "Room Occup+HU+Comp" (F23) per Milind annotation #4
+    roomsOccupied: num('F23'),
+    roomsOccupiedLY: num('X23'),
+    // Vacant per the file's own count
+    vacant: num('F25'),
+    vacantLY: num('X25'),
+
+    // KPI tiles (Today)
+    // Occupancy %: use "Occupancy % Incl HU+Comp" (F35) per annotation #1
+    occupancy: num('F35'),                 occupancyLY: num('X35'),
+    arr: num('F37') * REV_MULT,            arrLY: num('X37') * REV_MULT,
+    revpar: num('F39'),                    revparLY: num('X39'),
+    arrivals: num('F47'),                  arrivalsLY: num('X47'),
+    departures: num('F49'),                departuresLY: num('X49'),
+    guests: num('F27'),                    guestsLY: num('X27'),
+
+    // Revenue tiles (×1.10 multiplier applied to all four)
+    roomRev: num('F56') * REV_MULT,        roomRevLY: num('X56') * REV_MULT,
+    fbRev: num('G75') * REV_MULT,          fbRevLY: num('X75') * REV_MULT,
+    // "Other Revenue" plays the same role as Minor/Retail in this file
+    minorRev: num('G93') * REV_MULT,       minorRevLY: num('X93') * REV_MULT,
+    minorRevLabel: 'Other Revenue',
+
+    // Rev per guest — derive from displayed scaled totals / guests
+    revPerGuest: num('F27') > 0
+      ? ((num('F56') + num('G75') + num('G93')) * REV_MULT) / num('F27')
+      : 0,
+    revPerGuestLY: num('X27') > 0
+      ? ((num('X56') + num('X75') + num('X93')) * REV_MULT) / num('X27')
+      : 0,
+
+    // Occupancy chart needs Today/MTD/YTD for both years
+    occupancyMTD: num('J35'),    occupancyMTDLY: num('AA35'),
+    occupancyYTD: num('R35'),    occupancyYTDLY: num('AF35'),
+  };
+
+  // Period comparison table — full Today/MTD/YTD with LY.
+  const periodMap = {
+    today: { ty: 'F', ly: 'X'  },
+    mtd:   { ty: 'J', ly: 'AA' },
+    ytd:   { ty: 'R', ly: 'AF' },
+  };
+  // For each metric: source row + whether ×1.10 applies + which column to use
+  // (some rows like Total F&B / Other Revenue use column G for the Today TY
+  // total, but the MTD/YTD totals are back in column J/R).
+  const rowMap = {
+    occupancy:     { row: '35' },
+    roomsOccupied: { row: '23' },
+    guests:        { row: '27' },
+    roomRev:       { row: '56',  scale: REV_MULT },
+    // F&B total: row 75 — Today TY in column G, MTD TY in column J, YTD TY in R
+    fbRev:         { row: '75',  scale: REV_MULT, todayCol: 'G' },
+    arr:           { row: '37',  scale: REV_MULT },
+    revpar:        { row: '39' },
+    // For revPerGuest we compute it; not directly mapped
+  };
+  ['today','mtd','ytd'].forEach(p => {
+    Object.entries(rowMap).forEach(([metric, info]) => {
+      const factor = info.scale || 1;
+      // For Today TY, some metrics live in column G (totals row); use override if set
+      const tyCol = (p === 'today' && info.todayCol) ? info.todayCol : periodMap[p].ty;
+      data[metric+'_'+p]   = num(tyCol + info.row) * factor;
+      data[metric+'LY_'+p] = num(periodMap[p].ly + info.row) * factor;
+    });
+    // Computed Revenue/guest for this period
+    const tyColForToday = periodMap[p].ty === 'F' ? 'G' : periodMap[p].ty;  // not used here; fbRev/other live in G only for Today
+    const fbCol  = (p === 'today') ? 'G' : periodMap[p].ty;
+    const othCol = (p === 'today') ? 'G' : periodMap[p].ty;
+    const guestsTY = num(periodMap[p].ty + '27');
+    const guestsLY = num(periodMap[p].ly + '27');
+    const scaledTotalTY = (num(periodMap[p].ty + '56') + num(fbCol + '75') + num(othCol + '93')) * REV_MULT;
+    const scaledTotalLY = (num(periodMap[p].ly + '56') + num(periodMap[p].ly + '75') + num(periodMap[p].ly + '93')) * REV_MULT;
+    data['revPerGuest_'+p]   = guestsTY > 0 ? scaledTotalTY / guestsTY : 0;
+    data['revPerGuestLY_'+p] = guestsLY > 0 ? scaledTotalLY / guestsLY : 0;
+  });
+
+  return data;
+}
+
 // Vendome Plaza format ("Managers Report") — simple tabular layout
 //   Description in column A, This Year: Today=B, MTD=C, YTD=D
 //   Last Year: Today=E, MTD=F, YTD=G
@@ -1143,8 +1267,8 @@ function parseFile(workbook) {
     const sheet = workbook.Sheets[name];
     if (!sheet) continue;
     const fmt = detectFormat(sheet);
-    // If this sheet has strong evidence (vendome/luxe), use it immediately
-    if (fmt === 'vendome' || fmt === 'luxe') {
+    // If this sheet has strong evidence (vendome/dailysales/luxe), use it immediately
+    if (fmt === 'vendome' || fmt === 'dailysales' || fmt === 'luxe') {
       detectedFmt = fmt;
       chosenSheet = sheet;
       break;
@@ -1162,8 +1286,9 @@ function parseFile(workbook) {
     detectedFmt = 'donatello';
   }
   console.log('Detected file format:', detectedFmt);
-  if (detectedFmt === 'vendome') return parseVendomeFormat(chosenSheet);
-  if (detectedFmt === 'luxe')    return parseLuxeFormat(chosenSheet);
+  if (detectedFmt === 'vendome')    return parseVendomeFormat(chosenSheet);
+  if (detectedFmt === 'dailysales') return parseDailySalesFormat(chosenSheet);
+  if (detectedFmt === 'luxe')       return parseLuxeFormat(chosenSheet);
   return parseDonatelloFormat(chosenSheet);
 }
 
