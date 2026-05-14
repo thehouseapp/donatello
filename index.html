@@ -675,7 +675,7 @@ function renderDashboard(data) {
   // per source format: "Other Revenue" for Daily Sales / Vendome, "Retail Shop
   // Revenue" for Donatello / LUXE Hotels). Value is already ×1.10-scaled in
   // the parser for formats where that rule applies.
-  const otherLabel = data.minorRevLabel || 'Retail Shop Revenue';
+  const otherLabel = data.minorRevLabel || 'Other Revenue';
   document.getElementById('other-label').textContent = otherLabel;
   document.getElementById('other-val').textContent = fmt.money(data.minorRev || 0, data.currency);
   setDelta('other-delta', data.minorRevLY ? ((data.minorRev - data.minorRevLY) / data.minorRevLY) * 100 : null, true);
@@ -734,7 +734,7 @@ function renderDashboard(data) {
   document.getElementById('totalInv').textContent = `Total inventory: ${totalInv} rooms`;
 
   const totalRev = data.roomRev + data.fbRev + data.minorRev;
-  const minorLabel = data.minorRevLabel || 'Retail Shop Revenue';
+  const minorLabel = data.minorRevLabel || 'Other Revenue';
   const pct = (n) => totalRev > 0 ? (n/totalRev*100) : 0;
   document.getElementById('revLegend').innerHTML = `
     <span><span class="legend-dot" style="background:${getColor('blue')}"></span>Rooms ${pct(data.roomRev).toFixed(1)}%</span>
@@ -792,12 +792,15 @@ function renderDashboard(data) {
 
 function renderPeriodTable(data) {
   // Each row: one metric, with TY/LY/Var across Today, MTD, YTD
+  // Label for the "third revenue" line — set by parser (default "Other Revenue")
+  const otherRevLabel = data.minorRevLabel || 'Other Revenue';
   const metrics = [
     { label: 'Occupancy %',    key: 'occupancy',     suffix: '%', isPP: true },
     { label: 'Rooms occupied', key: 'roomsOccupied' },
     { label: 'Total guests',   key: 'guests' },
     { label: 'Room revenue',   key: 'roomRev',       money: true },
     { label: 'F&B revenue',    key: 'fbRev',         money: true },
+    { label: otherRevLabel,    key: 'minorRev',      money: true },
     { label: 'ARR',            key: 'arr',           money: true, decimals: 2 },
     { label: 'RevPAR',         key: 'revpar',        money: true, decimals: 2 },
     { label: 'Revenue/guest',  key: 'revPerGuest',   money: true, decimals: 2 },
@@ -936,6 +939,7 @@ function parseDonatelloFormat(sheet) {
     guests:        '22',   // Guests In-House
     roomRev:       '74',   // Room Revenue
     fbRev:         '77',   // F & B Revenue
+    minorRev:      '80',   // Minor Operating (shown as "Other Revenue")
     arr:           '86',   // ARR without Comps
     revpar:        '92',   // Revenue PAR
     revPerGuest:   '71',   // Revenue per Guest
@@ -1002,6 +1006,7 @@ function parseLuxeFormat(sheet) {
     guests:        '22',
     roomRev:       '104',
     fbRev:         '107',
+    minorRev:      '110',   // Minor Operating (shown as "Other Revenue")
     arr:           '116',
     revpar:        '125',
     revPerGuest:   '101',
@@ -1111,6 +1116,8 @@ function parseDailySalesFormat(sheet) {
     roomRev:       { row: '56',  scale: REV_MULT },
     // F&B total: row 75 — Today TY in column G, MTD TY in column J, YTD TY in R
     fbRev:         { row: '75',  scale: REV_MULT, todayCol: 'G' },
+    // Other Revenue total: row 93 — same pattern as F&B (Today TY in column G)
+    minorRev:      { row: '93',  scale: REV_MULT, todayCol: 'G' },
     arr:           { row: '37',  scale: REV_MULT },
     revpar:        { row: '39' },
     // For revPerGuest we compute it; not directly mapped
@@ -1243,6 +1250,7 @@ function parseVendomeFormat(sheet) {
     guests:        { row: '15' },
     roomRev:       { row: '29', scale: REV_MULT },
     fbRev:         { row: '30', scale: REV_MULT },
+    minorRev:      { row: '31' },  // Other Revenue — not scaled for Vendome
     arr:           { row: '40', scale: REV_MULT },
   };
   ['today','mtd','ytd'].forEach(p => {
