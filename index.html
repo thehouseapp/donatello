@@ -859,9 +859,13 @@ function getColor(name) {
 
 // Detect format by inspecting a candidate sheet.
 function detectFormat(sheet) {
-  // Vendome: A5 contains "TOTAL ROOMS IN HOTEL"
+  // Vendome (legacy): "TOTAL ROOMS IN HOTEL" in A5
   const a5 = (sheet['A5'] && sheet['A5'].v) ? String(sheet['A5'].v).trim().toLowerCase() : '';
   if (a5.startsWith('total rooms in hotel')) return 'vendome';
+  // Vendome (current export): the same label sits one row lower, in A6
+  // (row 5 is now a divider line). Whole layout shifted down.
+  const a6 = (sheet['A6'] && sheet['A6'].v) ? String(sheet['A6'].v).trim().toLowerCase() : '';
+  if (a6.startsWith('total rooms in hotel')) return 'vendome_new';
   // Daily Sales Report (Prologic First / Crystal Reports): B4 = "DAILY SALES REPORT"
   // Used by LUXE Avenue, LUXE Grand, LUXE Retreat
   const b4 = (sheet['B4'] && sheet['B4'].v) ? String(sheet['B4'].v).trim().toLowerCase() : '';
@@ -1362,6 +1366,139 @@ function parseVendomeFormat(sheet) {
   return data;
 }
 
+// Vendome Plaza — CURRENT format ("Manager Report", newer export).
+// Same tabular shape and column scheme as the legacy Vendome file
+//   TY: Today=B, MTD=C, YTD=D   |   LY: Today=E, MTD=F, YTD=G
+// but the whole sheet shifted down, so every metric row differs:
+//   Total rooms 6 | OOO 7 | House use 11 | Occupied(excl comp/HU) 12
+//   Guest in-house 16 | Available-OOO (vacant) 15 | %Occ-comps 23
+//   Room rev 30 | F&B 31 | Other 32 | ARR w/o comps 42
+//   Arrivals 47 | Departures 54
+// Unlike the legacy file, this export DOES carry a business date in A1.
+//
+// Business rules unchanged: Room Rev, F&B, ARR grossed up ×1.10; Other Revenue
+// not scaled; RevPAR = (Room Rev × 1.10) / Total Rooms In Hotel.
+function parseVendomeNewFormat(sheet) {
+  const g = (ref) => getCell(sheet, ref);
+  const num = (ref) => {
+    const v = g(ref);
+    if (typeof v === 'number') return v;
+    if (typeof v === 'string') {
+      const cleaned = v.replace(/,/g, '').trim();
+      const n = parseFloat(cleaned);
+      return isNaN(n) ? 0 : n;
+    }
+    return 0;
+  };
+
+  const REV_MULT = 1.10;
+
+  // Business date now present in A1 (fall back to today if unreadable)
+  let businessDate = new Date();
+  const dc = sheet['A1'];
+  if (dc) {
+    if (dc.t === 'd') businessDate = dc.v;
+    else if (typeof dc.v === 'number') businessDate = XLSX.SSF.parse_date_code(dc.v);
+    else if (dc.v) { const parsed = new Date(dc.v); if (!isNaN(parsed)) businessDate = parsed; }
+  }
+
+  const data = {
+    hotelName: 'Vendome Plaza',
+    businessDate,
+    currency: 'AED',
+
+    // Inventory (Today)
+    saleable: num('B6'),                       // TOTAL ROOMS IN HOTEL = 110
+    ooo: num('B7'),                            // OUT OF ORDER ROOMS
+    oooLY: num('E7'),
+    houseUse: num('B11'),                      // HOUSE USE
+    houseUseLY: num('E11'),
+    roomsOccupied: num('B12'),                 // ROOMS OCCUPIED - COMPS/HOUSE (excl comps & HU)
+    roomsOccupiedLY: num('E12'),
+
+    // KPI tiles (Today)
+    occupancy: num('B23'),                     // %ROOMS OCCUPIED - COMPS
+    occupancyLY: num('E23'),
+    arrivals: num('B47'),                      // ROOM ARRIVALS
+    arrivalsLY: num('E47'),
+    departures: num('B54'),                    // ROOM DEPARTURES
+    departuresLY: num('E54'),
+    guests: num('B16'),                        // GUEST IN HOUSE
+    guestsLY: num('E16'),
+
+    // Revenue tiles (Room & F&B scaled ×1.10)
+    roomRev: num('B30') * REV_MULT,
+    roomRevLY: num('E30') * REV_MULT,
+    fbRev: num('B31') * REV_MULT,
+    fbRevLY: num('E31') * REV_MULT,
+    // "Other Revenue" — not scaled for Vendome
+    minorRev: num('B32'),
+    minorRevLY: num('E32'),
+    minorRevLabel: 'Other Revenue',
+
+    // ARR (scaled ×1.10) — "ARR WITHOUT COMPS" (B42)
+    arr: num('B42') * REV_MULT,
+    arrLY: num('E42') * REV_MULT,
+
+    // RevPAR = (Room Rev × 1.10) / Total Rooms In Hotel (row 6)
+    revpar: num('B6') > 0 ? (num('B30') * REV_MULT) / num('B6') : 0,
+    revparLY: num('E6') > 0 ? (num('E30') * REV_MULT) / num('E6') : 0,
+
+    // Revenue per guest — from displayed (scaled) totals / guests
+    revPerGuest: num('B16') > 0
+      ? ((num('B30') + num('B31')) * REV_MULT + num('B32')) / num('B16')
+      : 0,
+    revPerGuestLY: num('E16') > 0
+      ? ((num('E30') + num('E31')) * REV_MULT + num('E32')) / num('E16')
+      : 0,
+
+    // Occupancy chart Today/MTD/YTD
+    occupancyMTD: num('C23'),     occupancyMTDLY: num('F23'),
+    occupancyYTD: num('D23'),     occupancyYTDLY: num('G23'),
+  };
+
+  // Vacant per the file's own count (B15 = AVAILABLE ROOMS - OOO)
+  data.vacant = num('B15');
+  data.vacantLY = num('E15');
+
+  // Period comparison — full Today/MTD/YTD with real LY.
+  const periodMap = {
+    today: { ty: 'B', ly: 'E' },
+    mtd:   { ty: 'C', ly: 'F' },
+    ytd:   { ty: 'D', ly: 'G' },
+  };
+  const rowMap = {
+    occupancy:     { row: '23' },
+    roomsOccupied: { row: '12' },
+    guests:        { row: '16' },
+    roomRev:       { row: '30', scale: REV_MULT },
+    fbRev:         { row: '31', scale: REV_MULT },
+    minorRev:      { row: '32' },  // Other Revenue — not scaled
+    arr:           { row: '42', scale: REV_MULT },
+  };
+  ['today','mtd','ytd'].forEach(p => {
+    Object.entries(rowMap).forEach(([metric, info]) => {
+      const factor = info.scale || 1;
+      data[metric+'_'+p]   = num(periodMap[p].ty + info.row) * factor;
+      data[metric+'LY_'+p] = num(periodMap[p].ly + info.row) * factor;
+    });
+    // RevPAR = (Room Rev × 1.10) / Total Rooms In Hotel (row 6)
+    const totalTY = num(periodMap[p].ty + '6');
+    const totalLY = num(periodMap[p].ly + '6');
+    data['revpar_'+p]   = totalTY > 0 ? (num(periodMap[p].ty + '30') * REV_MULT) / totalTY : 0;
+    data['revparLY_'+p] = totalLY > 0 ? (num(periodMap[p].ly + '30') * REV_MULT) / totalLY : 0;
+    // Revenue per Guest = (scaled total revenue) / guests
+    const guestsTY = num(periodMap[p].ty + '16');
+    const guestsLY = num(periodMap[p].ly + '16');
+    const totalRevTY = (num(periodMap[p].ty + '30') + num(periodMap[p].ty + '31')) * REV_MULT + num(periodMap[p].ty + '32');
+    const totalRevLY = (num(periodMap[p].ly + '30') + num(periodMap[p].ly + '31')) * REV_MULT + num(periodMap[p].ly + '32');
+    data['revPerGuest_'+p]   = guestsTY > 0 ? totalRevTY / guestsTY : 0;
+    data['revPerGuestLY_'+p] = guestsLY > 0 ? totalRevLY / guestsLY : 0;
+  });
+
+  return data;
+}
+
 // Auto-detect format and route to the right parser.
 // Scans every sheet in the workbook (Vendome's data lives in Sheet2, not Sheet1).
 function parseFile(workbook) {
@@ -1373,7 +1510,7 @@ function parseFile(workbook) {
     if (!sheet) continue;
     const fmt = detectFormat(sheet);
     // If this sheet has strong evidence, use it immediately
-    if (fmt === 'vendome' || fmt === 'dailysales' || fmt === 'luxe' || fmt === 'donatello_new') {
+    if (fmt === 'vendome' || fmt === 'vendome_new' || fmt === 'dailysales' || fmt === 'luxe' || fmt === 'donatello_new') {
       detectedFmt = fmt;
       chosenSheet = sheet;
       break;
@@ -1392,6 +1529,7 @@ function parseFile(workbook) {
   }
   console.log('Detected file format:', detectedFmt);
   if (detectedFmt === 'vendome')        return parseVendomeFormat(chosenSheet);
+  if (detectedFmt === 'vendome_new')    return parseVendomeNewFormat(chosenSheet);
   if (detectedFmt === 'dailysales')     return parseDailySalesFormat(chosenSheet);
   if (detectedFmt === 'luxe')           return parseLuxeFormat(chosenSheet);
   if (detectedFmt === 'donatello_new')  return parseDonatelloNewFormat(chosenSheet);
